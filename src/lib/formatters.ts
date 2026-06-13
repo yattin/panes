@@ -27,6 +27,13 @@ const COMPACT_LABELS: Record<AppLocale, {
     day: "d",
     month: "mo",
   },
+  "zh-CN": {
+    now: "刚刚",
+    minute: "分钟",
+    hour: "小时",
+    day: "天",
+    month: "月",
+  },
 };
 
 function asLocale(locale?: string | null): AppLocale {

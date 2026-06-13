@@ -27,13 +27,16 @@
   "chatEngines": {
     "title": "Escolha seus harnesses de chat",
     "subtitle": "Selecione quais harnesses você quer deixar prontos dentro do chat do Panes.",
-    "helper": "Você pode selecionar Codex, Claude, OpenCode ou qualquer combinação. O próximo passo verifica cada runtime selecionado antes de continuar.",
+    "helper": "Você pode selecionar Codex, Claude, Claude Code (Native), OpenCode ou qualquer combinação. O próximo passo verifica cada runtime selecionado antes de continuar.",
     "options": {
       "codex": {
         "description": "Chat via Codex App Server. Pode instalar Node.js e Codex CLI se estiverem ausentes."
       },
       "claude": {
         "description": "Chat via Claude Agent SDK. Não exige instalar a Claude CLI separadamente."
+      },
+      "claudeCodeNative": {
+        "description": "Chat integrado via claude-code-rust. Roda dentro do Panes sem um processo CLI separado."
       },
       "opencode": {
         "description": "Chat via servidor headless do OpenCode. Exige a CLI opencode no PATH."

@@ -19,6 +19,14 @@ describe("resolveEngineCapabilities", () => {
     });
   });
 
+  it("falls back to Claude Code Native defaults when capabilities are unavailable", () => {
+    expect(resolveEngineCapabilities("claude-code-native", null)).toEqual({
+      permissionModes: ["restricted", "standard", "trusted"],
+      sandboxModes: ["read-only", "workspace-write"],
+      approvalDecisions: ["accept", "decline", "accept_for_session"],
+    });
+  });
+
   it("falls back to OpenCode defaults when capabilities are unavailable", () => {
     expect(resolveEngineCapabilities("opencode", null)).toEqual({
       permissionModes: ["ask", "allow", "deny"],

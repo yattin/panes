@@ -12,6 +12,12 @@ const CLAUDE_CAPABILITIES: EngineCapabilities = {
   approvalDecisions: ["accept", "decline", "accept_for_session"],
 };
 
+const CLAUDE_CODE_NATIVE_CAPABILITIES: EngineCapabilities = {
+  permissionModes: ["restricted", "standard", "trusted"],
+  sandboxModes: ["read-only", "workspace-write"],
+  approvalDecisions: ["accept", "decline", "accept_for_session"],
+};
+
 const OPENCODE_CAPABILITIES: EngineCapabilities = {
   permissionModes: ["ask", "allow", "deny"],
   sandboxModes: [],
@@ -30,6 +36,8 @@ function fallbackEngineCapabilities(engineId?: string | null): EngineCapabilitie
       return CODEX_CAPABILITIES;
     case "claude":
       return CLAUDE_CAPABILITIES;
+    case "claude-code-native":
+      return CLAUDE_CODE_NATIVE_CAPABILITIES;
     case "opencode":
       return OPENCODE_CAPABILITIES;
     default:

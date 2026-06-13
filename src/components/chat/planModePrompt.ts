@@ -1,7 +1,8 @@
 import type { Message, ThreadStatus } from "../../types";
+import { isClaudeFamilyEngine } from "../../lib/chatEngineIds";
 
 export function getPlanImplementationCodingMessage(engineId?: string | null): string {
-  return engineId === "claude"
+  return isClaudeFamilyEngine(engineId)
     ? "Exit plan mode and implement the plan."
     : "Implement the plan.";
 }
@@ -111,6 +112,6 @@ export function shouldPromptToImplementPlan({
   // the SDK level but still signals the agent considers planning complete).
   return (
     assistantMessages.some(messageHasStructuredPlan) ||
-    (engineId === "claude" && assistantMessages.some(messageHasExitPlanModeAttempt))
+    (isClaudeFamilyEngine(engineId) && assistantMessages.some(messageHasExitPlanModeAttempt))
   );
 }

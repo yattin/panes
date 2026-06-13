@@ -1,0 +1,198 @@
+{
+  "panel": {
+    "tabs": {
+      "changes": "更改",
+      "branches": "分支",
+      "commits": "历史",
+      "stash": "贮藏",
+      "files": "文件",
+      "worktrees": "工作树"
+    },
+    "detached": "游离",
+    "syncing": "同步中...",
+    "refreshAndFetch": "刷新并拉取",
+    "moreActions": "更多操作",
+    "pin": "固定 Git 面板",
+    "unpin": "取消固定 Git 面板",
+    "reveal": "打开浮动 Git 面板",
+    "backToMainRepo": "返回主仓库",
+    "scanningRepositories": "扫描仓库中...",
+    "noRepositories": "未找到仓库",
+    "scanningHint": "正在检查此工作区中的 git 仓库",
+    "blockedByRepo": "此工作区已在 {{path}} 的 Git 仓库内。",
+    "openFolderHint": "打开包含 git 仓库的文件夹",
+    "initializeRepository": "初始化仓库",
+    "initializingRepository": "初始化中...",
+    "repositoryInitialized": "仓库已初始化",
+    "fetchedFromRemote": "已从远程拉取",
+    "pulledFromRemote": "已从远程拉取",
+    "pushedToRemote": "已推送到远程",
+    "refreshed": "已刷新",
+    "softResetCompleted": "软重置已完成",
+    "undoLastCommit": "撤销最后一次提交",
+    "undoLastCommitMessage": "这将撤销最近的提交并保持所有更改为已暂存状态。无法从 Panes 中撤销此操作。",
+    "softReset": "软重置",
+    "pull": "拉取",
+    "push": "推送",
+    "fetchAll": "拉取所有仓库",
+    "pullAll": "拉取所有仓库",
+    "fetchedAllRepos": "已拉取所有 {{count}} 个仓库",
+    "fetchAllPartialError": "{{count}} 个仓库拉取失败",
+    "pulledAllRepos": "已拉取所有 {{count}} 个仓库",
+    "pullAllPartialError": "{{count}} 个仓库拉取失败"
+  },
+  "branches": {
+    "scope": {
+      "local": "本地",
+      "remote": "远程"
+    },
+    "new": "新建分支",
+    "branchNamePlaceholder": "分支名称...",
+    "create": "创建",
+    "creating": "创建中...",
+    "searchPlaceholder": "搜索分支...",
+    "emptyTitle": "未找到分支",
+    "emptyHint": "创建一个分支以开始",
+    "emptyFiltered": "没有匹配的分支",
+    "current": "当前",
+    "actionsTitle": "分支操作",
+    "actions": {
+      "checkout": "切换",
+      "rename": "重命名",
+      "delete": "删除",
+      "confirmDelete": "确认删除？"
+    },
+    "loadMore": "加载更多 ({{current}}/{{total}})",
+    "loadingMore": "加载中...",
+    "toasts": {
+      "switchedTo": "已切换到 {{branchName}}",
+      "createdAndSwitched": "已创建并切换到分支：{{branchName}}",
+      "renamed": "已重命名分支",
+      "deleted": "已删除分支：{{branchName}}"
+    }
+  },
+  "commits": {
+    "title": "历史",
+    "count": "{{count}} 次提交",
+    "filteredCount": "{{current}}/{{total}} 次提交",
+    "filterPlaceholder": "筛选提交...",
+    "emptyTitle": "暂无提交",
+    "emptyHint": "提交更改以建立历史",
+    "emptyFiltered": "没有匹配的提交",
+    "loadingDiff": "加载差异中...",
+    "noChanges": "此提交无更改",
+    "loadMore": "加载更多",
+    "loadingMore": "加载中..."
+  },
+  "stash": {
+    "messagePlaceholder": "贮藏消息（可选）",
+    "stash": "贮藏",
+    "stashing": "贮藏中...",
+    "filterPlaceholder": "筛选贮藏...",
+    "emptyTitle": "无贮藏",
+    "emptyHint": "贮藏的更改将显示在这里",
+    "emptyFiltered": "没有匹配的贮藏",
+    "apply": "应用",
+    "pop": "弹出",
+    "toasts": {
+      "saved": "贮藏已保存",
+      "applied": "贮藏已应用"
+    }
+  },
+  "files": {
+    "filterPlaceholder": "筛选文件...",
+    "filterCount": "{{count}} 个文件",
+    "filterCountTitle": "仅搜索已展开的文件夹",
+    "loading": "加载文件中...",
+    "emptyFiltered": "没有文件匹配筛选条件",
+    "empty": "未找到文件"
+  },
+  "worktrees": {
+    "prune": "清理",
+    "new": "新建工作树",
+    "branchNamePlaceholder": "分支名称...",
+    "baseRefPlaceholder": "基础引用 (HEAD)",
+    "create": "创建",
+    "creating": "创建中...",
+    "filterPlaceholder": "筛选工作树...",
+    "emptyTitle": "无链接的工作树",
+    "emptyHint": "创建工作树以在并行分支上工作",
+    "emptyFiltered": "没有匹配的工作树",
+    "detached": "（游离）",
+    "main": "主",
+    "locked": "已锁定",
+    "prunable": "可清理",
+    "actionsTitle": "工作树操作",
+    "actions": {
+      "openInPanel": "在面板中打开",
+      "remove": "移除工作树",
+      "removeDeleteBranch": "移除并删除分支",
+      "confirmRemove": "确认移除？"
+    },
+    "toasts": {
+      "created": "已创建工作树：{{branchName}}",
+      "pruned": "已清理过期的工作树",
+      "removed": "工作树已移除"
+    }
+  },
+  "changes": {
+    "section": {
+      "changes": "更改",
+      "staged": "已暂存"
+    },
+    "stageAll": "全部暂存",
+    "staging": "暂存中...",
+    "unstageAll": "全部取消暂存",
+    "unstaging": "取消暂存中...",
+    "stage": "暂存",
+    "unstage": "取消暂存",
+    "discard": "丢弃",
+    "discardChanges": "丢弃更改",
+    "discardAllChanges": "丢弃所有更改",
+    "discardFolderTitle": "丢弃此文件夹中的所有更改",
+    "stageFolderTitle": "暂存此文件夹中的所有更改",
+    "unstageFolderTitle": "取消暂存此文件夹中的所有更改",
+    "openInEditor": "在编辑器中打开",
+    "noStagedChanges": "无已暂存的更改",
+    "workingTreeClean": "工作树干净",
+    "workingTreeCleanHint": "无未提交的更改",
+    "noChanges": "无更改",
+    "untrackedFileHint": "未跟踪的文件。在编辑器中打开以查看内容，或暂存以查看补丁。",
+    "commitMessagePlaceholder": "提交消息...",
+    "commit": "提交",
+    "committing": "提交中...",
+    "toasts": {
+      "committed": "已提交：{{message}}"
+    },
+    "discardPrompts": {
+      "fileMessage": "丢弃对 \"{{name}}\" 的所有更改？此操作无法撤销。",
+      "directoryMessage_one": "丢弃 \"{{name}}\" 中的所有更改？{{count}} 个文件将被还原。此操作无法撤销。",
+      "directoryMessage_other": "丢弃 \"{{name}}\" 中的所有更改？{{count}} 个文件将被还原。此操作无法撤销。",
+      "allMessage_one": "丢弃所有未暂存的更改？{{count}} 个文件将被还原。此操作无法撤销。",
+      "allMessage_other": "丢弃所有未暂存的更改？{{count}} 个文件将被还原。此操作无法撤销。"
+    },
+    "diff": {
+      "previewTruncated": "预览已截断为 {{returned}}/{{original}}，以保持差异查看器的响应速度。",
+      "parsing": "解析差异中..."
+    }
+  },
+  "remotes": {
+    "title": "管理远程",
+    "loading": "加载中...",
+    "empty": "未配置远程。",
+    "rename": "重命名",
+    "remove": "移除",
+    "namePlaceholder": "名称",
+    "urlPlaceholder": "https://github.com/user/repo.git",
+    "add": "添加",
+    "adding": "添加中...",
+    "addRemote": "添加远程",
+    "removeTitle": "移除远程 \"{{name}}\"",
+    "removeMessage": "这将从此仓库移除远程 \"{{name}}\"。您可以稍后重新添加。",
+    "toasts": {
+      "added": "已添加远程 \"{{name}}\"",
+      "removed": "已移除远程 \"{{name}}\"",
+      "renamed": "已重命名远程为 \"{{name}}\""
+    }
+  }
+}

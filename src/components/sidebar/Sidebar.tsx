@@ -876,7 +876,11 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
                       transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
                     }}
                   >
-                    {locale === "en" ? "EN-US" : "PT-BR"}
+                    {locale === "en"
+                      ? "EN-US"
+                      : locale === "pt-BR"
+                        ? "PT-BR"
+                        : "中文"}
                   </button>
                 ))}
               </span>

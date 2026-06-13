@@ -9,6 +9,7 @@ import type {
 export const CHAT_ENGINE_INSTALL_HARNESS_IDS: Readonly<Record<OnboardingChatEngineId, string>> = {
   codex: "codex",
   claude: "claude-code",
+  "claude-code-native": "claude-code-native",
   opencode: "opencode",
 };
 
@@ -168,6 +169,10 @@ export function isChatEngineReady(
         dependencyReport.codex.found &&
         (engineHealth.codex?.available || isCodexAuthDeferred(engineHealth.codex)),
     );
+  }
+
+  if (engineId === "claude-code-native") {
+    return engineHealth["claude-code-native"]?.available ?? true;
   }
 
   return engineHealth[engineId]?.available ?? false;

@@ -11,6 +11,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     engines::{
         claude_sidecar::ClaudeSidecarEngine,
+        claude_code_native::ClaudeCodeNativeEngine,
         codex::{CodexEngine, CodexForkedThread, CodexReviewStarted},
         opencode::OpenCodeEngine,
     },
@@ -23,6 +24,7 @@ use crate::{
 
 pub mod api_direct;
 pub mod claude_sidecar;
+pub mod claude_code_native;
 pub mod codex;
 pub mod codex_event_mapper;
 pub mod codex_protocol;
@@ -128,6 +130,12 @@ const CLAUDE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
     approval_decisions: &["accept", "decline", "accept_for_session"],
 };
 
+const CLAUDE_CODE_NATIVE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
+    permission_modes: &["restricted", "standard", "trusted"],
+    sandbox_modes: &["read-only", "workspace-write"],
+    approval_decisions: &["accept", "decline", "accept_for_session"],
+};
+
 const OPENCODE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
     permission_modes: &["ask", "allow", "deny"],
     sandbox_modes: &[],
@@ -137,6 +145,7 @@ const OPENCODE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
 pub fn capabilities_for_engine(engine_id: &str) -> EngineCapabilities {
     match engine_id {
         "claude" => CLAUDE_CAPABILITIES,
+        "claude-code-native" => CLAUDE_CODE_NATIVE_CAPABILITIES,
         "codex" => CODEX_CAPABILITIES,
         "opencode" => OPENCODE_CAPABILITIES,
         _ => EngineCapabilities {
@@ -454,6 +463,7 @@ pub trait Engine: Send + Sync {
 pub struct EngineManager {
     codex: Arc<CodexEngine>,
     claude: Arc<ClaudeSidecarEngine>,
+    claude_code_native: Arc<ClaudeCodeNativeEngine>,
     opencode: Arc<OpenCodeEngine>,
 }
 
@@ -462,6 +472,7 @@ impl EngineManager {
         Self {
             codex: Arc::new(CodexEngine::default()),
             claude: Arc::new(ClaudeSidecarEngine::default()),
+            claude_code_native: Arc::new(ClaudeCodeNativeEngine::new()),
             opencode: Arc::new(OpenCodeEngine::default()),
         }
     }
@@ -508,6 +519,19 @@ impl EngineManager {
                 name: self.claude.name().to_string(),
                 models: claude_models.into_iter().map(map_model_info).collect(),
                 capabilities: map_engine_capabilities(capabilities_for_engine(self.claude.id())),
+            },
+            EngineInfoDto {
+                id: self.claude_code_native.id().to_string(),
+                name: self.claude_code_native.name().to_string(),
+                models: self
+                    .claude_code_native
+                    .models()
+                    .into_iter()
+                    .map(map_model_info)
+                    .collect(),
+                capabilities: map_engine_capabilities(capabilities_for_engine(
+                    self.claude_code_native.id(),
+                )),
             },
             EngineInfoDto {
                 id: self.opencode.id().to_string(),
@@ -559,6 +583,23 @@ impl EngineManager {
                     protocol_diagnostics: None,
                 })
             }
+            "claude-code-native" => {
+                let available = self.claude_code_native.is_available().await;
+                Ok(EngineHealthDto {
+                    id: "claude-code-native".to_string(),
+                    available,
+                    version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                    details: Some(if available {
+                        "Claude Code Native engine is ready".to_string()
+                    } else {
+                        "Configure API credentials for Claude Code Native".to_string()
+                    }),
+                    warnings: vec![],
+                    checks: vec![],
+                    fixes: vec![],
+                    protocol_diagnostics: None,
+                })
+            }
             _ => anyhow::bail!("unknown engine: {engine_id}"),
         }
     }
@@ -567,6 +608,7 @@ impl EngineManager {
         match engine_id {
             "codex" => self.codex.prewarm().await,
             "claude" => self.claude.prewarm().await,
+            "claude-code-native" => Ok(()),
             "opencode" => self.opencode.prewarm().await,
             _ => anyhow::bail!("unknown engine: {engine_id}"),
         }
@@ -729,6 +771,11 @@ impl EngineManager {
                 .start_thread(scope, resume_id, effective_model_id, sandbox)
                 .await
                 .context("failed to start opencode thread")?,
+            "claude-code-native" => self
+                .claude_code_native
+                .start_thread(scope, resume_id, effective_model_id, sandbox)
+                .await
+                .context("failed to start claude-code-native thread")?,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         };
 
@@ -759,6 +806,11 @@ impl EngineManager {
                 .send_message(engine_thread_id, input, event_tx, cancellation)
                 .await
                 .context("opencode send_message failed"),
+            "claude-code-native" => self
+                .claude_code_native
+                .send_message(engine_thread_id, input, event_tx, cancellation)
+                .await
+                .context("claude-code-native send_message failed"),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -785,6 +837,11 @@ impl EngineManager {
                 .steer_message(engine_thread_id, input)
                 .await
                 .context("opencode steer_message failed"),
+            "claude-code-native" => self
+                .claude_code_native
+                .steer_message(engine_thread_id, input)
+                .await
+                .context("claude-code-native steer_message failed"),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -812,6 +869,11 @@ impl EngineManager {
                     .respond_to_approval(approval_id, response, route)
                     .await
             }
+            "claude-code-native" => {
+                self.claude_code_native
+                    .respond_to_approval(approval_id, response, route)
+                    .await
+            }
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -821,6 +883,7 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.interrupt(engine_thread_id).await,
             "claude" => self.claude.interrupt(engine_thread_id).await,
+            "claude-code-native" => self.claude_code_native.interrupt(engine_thread_id).await,
             "opencode" => self.opencode.interrupt(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
@@ -834,6 +897,7 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.archive_thread(engine_thread_id).await,
             "claude" => self.claude.archive_thread(engine_thread_id).await,
+            "claude-code-native" => self.claude_code_native.archive_thread(engine_thread_id).await,
             "opencode" => self.opencode.archive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
@@ -847,6 +911,7 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.unarchive_thread(engine_thread_id).await,
             "claude" => self.claude.unarchive_thread(engine_thread_id).await,
+            "claude-code-native" => self.claude_code_native.unarchive_thread(engine_thread_id).await,
             "opencode" => self.opencode.unarchive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
@@ -875,8 +940,7 @@ impl EngineManager {
     ) -> anyhow::Result<()> {
         match thread.engine_id.as_str() {
             "codex" => self.codex.set_thread_name(engine_thread_id, name).await,
-            "claude" => Ok(()),
-            "opencode" => Ok(()),
+            "claude" | "claude-code-native" | "opencode" => Ok(()),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -899,8 +963,7 @@ impl EngineManager {
                 .read_thread_sync_snapshot(engine_thread_id)
                 .await
                 .map(Some),
-            "claude" => Ok(None),
-            "opencode" => Ok(None),
+            "claude" | "claude-code-native" | "opencode" => Ok(None),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }

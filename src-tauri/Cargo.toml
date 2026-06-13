@@ -13,6 +13,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Claude Code Rust integration
+claude_code_rs = { path = "../vendor/claude-code-rust", default-features = false, features = ["i18n"] }
+
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
@@ -21,25 +24,25 @@ tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true }
 tokio-util = "0.7"
 tokio-stream = "0.1"
-futures = "0.3"
-async-trait = "0.1"
+futures = { workspace = true }
+async-trait = { workspace = true }
 
-reqwest = { version = "0.12", features = ["json", "stream"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["raw_value"] }
-base64 = "0.22"
-toml = "0.8"
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+toml = { workspace = true }
 libc = "0.2"
 
 rusqlite = { version = "0.31", features = ["bundled"] }
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-anyhow = "1"
-thiserror = "1"
-log = "0.4"
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
 env_logger = "0.11"
 which = "6"
 flate2 = "1"

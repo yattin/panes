@@ -19,7 +19,8 @@
     "label": "Language",
     "changed": "Language updated. Native menu labels update after restart.",
     "english": "English",
-    "portugueseBrazil": "Português (Brasil)"
+    "portugueseBrazil": "Português (Brasil)",
+    "simplifiedChinese": "简体中文"
   },
   "labels": {
     "settings": "Settings"

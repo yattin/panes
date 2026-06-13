@@ -56,6 +56,7 @@ import { useGitStore } from "../../stores/gitStore";
 import { useTerminalStore, type LayoutMode } from "../../stores/terminalStore";
 import { toast } from "../../stores/toastStore";
 import { ipc } from "../../lib/ipc";
+import { isClaudeFamilyEngine } from "../../lib/chatEngineIds";
 import { resolvePreferredOnboardingChatSelection } from "../../lib/onboarding";
 import { recordPerfMetric } from "../../lib/perfTelemetry";
 import { isMacDesktop, usesCustomWindowFrame } from "../../lib/windowActions";
@@ -616,6 +617,7 @@ function getAttachmentFilterConfig(
         textFilesLabel: t("attachments.filters.textFiles"),
       };
     case "claude":
+    case "claude-code-native":
       return {
         supportedExtensions: CLAUDE_ATTACHMENT_EXTENSIONS,
         textExtensions: CLAUDE_TEXT_ATTACHMENT_EXTENSIONS,
@@ -792,7 +794,7 @@ function readThreadOpenCodeAgentValue(thread: Thread | null): string {
 }
 
 function readThreadApprovalPolicyValue(thread: Thread | null): ThreadApprovalPolicyValue {
-  if (thread?.engineId === "claude") {
+  if (isClaudeFamilyEngine(thread?.engineId)) {
     return readClaudeThreadPermissionModeValue(thread);
   }
   if (thread?.engineId === "opencode") {
@@ -875,7 +877,7 @@ function applyThreadExecutionPolicyPatch(
     approvalPolicy: nextApprovalPolicy,
   };
 
-  if (thread.engineId === "claude") {
+  if (isClaudeFamilyEngine(thread.engineId)) {
     if (
       nextState.approvalPolicy === "restricted" ||
       nextState.approvalPolicy === "standard" ||
@@ -2104,13 +2106,13 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     [activeThread?.engineId, engines],
   );
   const activeThreadApprovalTitle =
-    activeThread?.engineId === "claude"
+    isClaudeFamilyEngine(activeThread?.engineId)
       ? t("policy.approvalTitleClaude")
       : activeThread?.engineId === "opencode"
         ? t("policy.approvalTitleOpenCode")
       : t("permissionPicker.approvalPolicy");
   const activeThreadApprovalOptions =
-    activeThread?.engineId === "claude"
+    isClaudeFamilyEngine(activeThread?.engineId)
       ? claudeThreadPermissionModeOptions
       : activeThread?.engineId === "opencode"
         ? openCodeThreadPermissionModeOptions
@@ -2158,7 +2160,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     (option) => option.value === activeThreadSandboxMode,
   );
   const activeThreadSandboxNotice =
-    activeThread?.engineId === "claude" && !activeThreadSandboxModeSupported
+    isClaudeFamilyEngine(activeThread?.engineId) && !activeThreadSandboxModeSupported
         ? t("policy.claudeSandboxNotice")
         : null;
   const activeThreadSandboxSelectedLabel =
@@ -2168,7 +2170,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   const threadPolicyCustomCount =
     activeThread?.engineId === "opencode"
       ? activeThreadApprovalPolicy !== "inherit" ? 1 : 0
-      : activeThread?.engineId === "claude"
+      : isClaudeFamilyEngine(activeThread?.engineId)
       ? (activeThreadApprovalPolicy !== "inherit" ? 1 : 0) +
         (activeThreadSandboxMode !== "inherit" ? 1 : 0) +
         (activeThreadNetworkPolicy !== "inherit" ? 1 : 0)

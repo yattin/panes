@@ -1,0 +1,107 @@
+{
+  "greeting": {
+    "title": "欢迎使用 Panes",
+    "subtitle": "您的本地 AI 辅助编程控制台。",
+    "cta": "开始使用"
+  },
+  "workflow": {
+    "title": "您更喜欢如何工作？",
+    "subtitle": "选择 Panes 应首先优化的工作流程。您可以稍后重新打开引导并切换。",
+    "options": {
+      "cli": {
+        "title": "CLI 代理",
+        "description": "浏览 Panes 已支持的代理 CLI，安装您想要的，然后选择要开始的工作区。"
+      },
+      "chat": {
+        "title": "与 Codex / Claude / OpenCode 聊天",
+        "description": "选择 Codex、Claude、OpenCode 或任意组合。Panes 将验证准备情况，帮助安装缺失的内容，然后将您发送到工作区。"
+      }
+    }
+  },
+  "cliProviders": {
+    "title": "选择您的 CLI 代理",
+    "subtitle": "查看此机器上已有的提供商，并在打开第一个工作区之前安装缺失的提供商。",
+    "helper": "这里故意跳过启动。引导在您确认工作区后结束，然后 Panes 会带您到工具面板。",
+    "scanning": "扫描可用提供商..."
+  },
+  "chatEngines": {
+    "title": "选择您的聊天工具",
+    "subtitle": "选择您想在 Panes 聊天中准备好的工具。",
+    "helper": "您可以选择 Codex、Claude、Claude Code（内置）、OpenCode 或任意组合。下一步将在继续之前检查每个选定的运行时。",
+    "options": {
+      "codex": {
+        "description": "由 Codex App Server 提供支持的聊天。如果缺少 Node.js 和 Codex CLI，可能会安装它们。"
+      },
+      "claude": {
+        "description": "由 Claude Agent SDK 提供支持的聊天。不需要单独安装 Claude CLI。"
+      },
+      "claudeCodeNative": {
+        "description": "由 claude-code-rust 提供支持的内置聊天。在 Panes 内运行，无需单独的 CLI 进程。"
+      },
+      "opencode": {
+        "description": "由 OpenCode 无头服务器提供支持的聊天。需要 PATH 中有 opencode CLI。"
+      }
+    }
+  },
+  "chatReadiness": {
+    "title": "验证聊天准备情况",
+    "subtitle": "Panes 正在检查选定的引擎，以及它们实际需要的聊天依赖项。",
+    "helper": "关于未来身份验证设置的警告在此版本中仅供参考。这里的目标是安装运行时并选择工作区。",
+    "loading": "检查选定的引擎...",
+    "readyHint": "为聊天选择的所有内容都已准备就绪。继续选择您想首先使用的工作区。",
+    "authDeferred": "Codex 仍需要账户登录，但这在此版本中不会阻止引导。现在完成引导，之后再完成 Codex 身份验证。",
+    "nodeInstallAvailable": "缺少 Node.js。Panes 可以自动安装它，以便选定的聊天引擎可以运行。",
+    "nodeInstallManual": "缺少 Node.js。手动安装 Node.js 20+，然后刷新准备情况检查。",
+    "codexInstallAvailable": "缺少 Codex CLI。Panes 可以为 Codex 聊天引擎自动安装它。",
+    "codexInstallManual": "缺少 Codex CLI。手动安装它，然后刷新准备情况检查。",
+    "openCodeInstallAvailable": "缺少 OpenCode CLI。Panes 可以使用 npm 为 OpenCode 聊天引擎安装它。",
+    "openCodeInstallManual": "缺少 OpenCode CLI。手动安装 Node.js/npm 和 OpenCode，然后刷新准备情况检查。",
+    "deps": {
+      "node": "Node.js"
+    },
+    "status": {
+      "ready": "就绪",
+      "attention": "需要注意",
+      "pending": "健康数据尚未加载。"
+    },
+    "sections": {
+      "warnings": "警告",
+      "checks": "检查",
+      "fixes": "建议的下一步",
+      "showNotes": "显示警告",
+      "hideNotes": "隐藏警告"
+    }
+  },
+  "workspace": {
+    "title": "确认您的第一个工作区",
+    "subtitle": "选择 Panes 在引导后应打开的工作区。即使已有一个活动的，也要在此明确确认。",
+    "helper": "选择现有工作区或打开新文件夹。引导仅在此确认后完成。",
+    "empty": "暂无可用的工作区。打开一个文件夹以继续。",
+    "current": "当前工作区"
+  },
+  "steps": {
+    "workflow": "工作流程",
+    "cliProviders": "提供商",
+    "chatEngines": "引擎",
+    "chatReadiness": "准备情况",
+    "workspace": "工作区"
+  },
+  "actions": {
+    "back": "返回",
+    "continue": "继续",
+    "finish": "完成引导",
+    "openFolder": "打开文件夹",
+    "refreshProviders": "刷新提供商",
+    "refreshStatus": "刷新状态",
+    "install": "安装",
+    "openWebsite": "打开网站",
+    "copied": "已复制"
+  },
+  "install": {
+    "waiting": "等待中...",
+    "installing": "安装 {{name}} 中..."
+  },
+  "footer": {
+    "stepCounter": "步骤 {{current}}/{{total}}"
+  }
+}

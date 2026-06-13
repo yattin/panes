@@ -198,14 +198,18 @@ pnpm release:check          # evaluate whether a release should be cut
 pnpm release                # run release-it
 ```
 
-Rust-only:
+Rust-only (from repository root):
 
 ```bash
-cd src-tauri
-cargo check
-cargo fmt
-cargo clippy
+cargo check --manifest-path src-tauri/Cargo.toml
+cargo fmt --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml
 ```
+
+The Rust workspace lives at the repository root (`Cargo.toml`) and includes:
+
+- `src-tauri/` — Tauri backend
+- `vendor/claude-code-rust/` — vendored built-in Claude Code engine (`claude-code-native`)
 
 Generated build artifacts can grow quickly during Tauri/Rust development. `pnpm prune:artifacts` removes all repo-local generated output, while `pnpm prune:artifacts:stale` trims only Rust/Tauri artifacts older than 7 days. Both are safe to regenerate on the next build, and the stale mode also accepts `--older-than-days=<n>` if you want a different window.
 
@@ -225,7 +229,7 @@ Generated build artifacts can grow quickly during Tauri/Rust development. `pnpm 
 User-facing frontend copy is localized with `i18next`/`react-i18next`. Treat i18n as part of the implementation of every new feature, not as cleanup work after the UI is already built.
 
 - Do not ship new visible UI strings hardcoded in components, dialogs, menus, toasts, or empty states
-- Add or update translation keys in both `src/i18n/resources/en/` and `src/i18n/resources/pt-BR/`
+- Add or update translation keys in `src/i18n/resources/en/`, `src/i18n/resources/pt-BR/`, and `src/i18n/resources/zh-CN/` when applicable
 - Reuse the existing namespace structure whenever possible and keep keys aligned across locales
 - Keep the i18n resource test passing when copy changes
 
@@ -233,7 +237,7 @@ User-facing frontend copy is localized with `i18next`/`react-i18next`. Treat i18
 
 Panes uses a React + Zustand frontend running inside a Tauri shell, with a Rust backend that owns persistence, engine orchestration, git operations, terminal management, and filesystem-safe file access.
 
-The app currently exposes Codex and Claude as chat engines. Codex talks to `codex app-server`; Claude is bridged through the bundled Claude runtime sidecar.
+The app currently exposes Codex, Claude (sidecar), Claude Code (Native), and OpenCode as chat engines. Codex talks to `codex app-server`; Claude is bridged through the bundled Claude runtime sidecar; Claude Code (Native) embeds the vendored `claude-code-rust` crate directly in the backend.
 
 ### Stack
 

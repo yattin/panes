@@ -1,0 +1,28 @@
+{
+  "actions": {
+    "allow": "允许",
+    "cancel": "取消",
+    "close": "关闭",
+    "copy": "复制",
+    "discard": "放弃",
+    "dismiss": "忽略",
+    "notNow": "暂不",
+    "remove": "移除",
+    "retry": "重试",
+    "save": "保存"
+  },
+  "fileReferences": {
+    "resolveFailed": "在此工作区找不到 {{reference}}。",
+    "shiftClickHint": "按住Shift点击可在编辑器中打开"
+  },
+  "language": {
+    "label": "语言",
+    "changed": "语言已更新。原生菜单标签将在重启后更新。",
+    "english": "English",
+    "portugueseBrazil": "Português (Brasil)",
+    "simplifiedChinese": "简体中文"
+  },
+  "labels": {
+    "settings": "设置"
+  }
+}

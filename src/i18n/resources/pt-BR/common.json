@@ -19,7 +19,8 @@
     "label": "Idioma",
     "changed": "Idioma atualizado. Os rótulos do menu nativo serão atualizados após reiniciar.",
     "english": "English",
-    "portugueseBrazil": "Português (Brasil)"
+    "portugueseBrazil": "Português (Brasil)",
+    "simplifiedChinese": "简体中文"
   },
   "labels": {
     "settings": "Configurações"
