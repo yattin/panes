@@ -1,8 +1,9 @@
 //! List Files Tool
 
-use super::{Tool, ToolOutput, ToolError};
+use super::{Tool, ToolError, ToolOutput};
 use async_trait::async_trait;
 use serde_json;
+use std::collections::HashMap;
 use std::path::Path;
 
 pub struct ListFilesTool;
@@ -24,11 +25,11 @@ impl Tool for ListFilesTool {
     fn name(&self) -> &str {
         "list_files"
     }
-    
+
     fn description(&self) -> &str {
         "List files in a directory"
     }
-    
+
     fn input_schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
@@ -40,39 +41,51 @@ impl Tool for ListFilesTool {
                 "recursive": {
                     "type": "boolean",
                     "description": "List recursively (optional)"
+                },
+                "max_entries": {
+                    "type": "integer",
+                    "description": "Maximum number of entries to return"
                 }
             },
             "required": ["path"]
         })
     }
-    
+
+    fn is_concurrency_safe(&self, _input: &serde_json::Value) -> bool {
+        true
+    }
+
+    fn tool_summary(&self, input: &serde_json::Value) -> Option<String> {
+        input["path"].as_str().map(|path| format!("list {}", path))
+    }
+
     async fn execute(&self, input: serde_json::Value) -> Result<ToolOutput, ToolError> {
-        let path = input["path"].as_str()
-            .ok_or_else(|| ToolError {
-                message: "path is required".to_string(),
-                code: Some("missing_parameter".to_string()),
-            })?;
-        
+        let path = input["path"].as_str().ok_or_else(|| ToolError {
+            message: "path is required".to_string(),
+            code: Some("missing_parameter".to_string()),
+        })?;
+
         let recursive = input["recursive"].as_bool().unwrap_or(false);
-        
+        let max_entries = input["max_entries"].as_u64().unwrap_or(1000) as usize;
+
         let list_path = Path::new(path);
-        
+
         if !list_path.exists() {
             return Err(ToolError {
                 message: format!("Path does not exist: {}", path),
                 code: Some("path_not_found".to_string()),
             });
         }
-        
+
         if !list_path.is_dir() {
             return Err(ToolError {
                 message: format!("Path is not a directory: {}", path),
                 code: Some("not_directory".to_string()),
             });
         }
-        
+
         let mut results = Vec::new();
-        
+
         if recursive {
             for entry in walkdir::WalkDir::new(list_path)
                 .into_iter()
@@ -81,29 +94,39 @@ impl Tool for ListFilesTool {
                 let entry_path = entry.path();
                 let file_type = if entry_path.is_dir() { "DIR" } else { "FILE" };
                 results.push(format!("{} [{}]", entry_path.display(), file_type));
+                if results.len() >= max_entries {
+                    break;
+                }
             }
         } else {
-            for entry in std::fs::read_dir(list_path)
-                .map_err(|e| ToolError {
-                    message: format!("Failed to read directory: {}", e),
-                    code: Some("read_error".to_string()),
-                })?
-            {
+            for entry in std::fs::read_dir(list_path).map_err(|e| ToolError {
+                message: format!("Failed to read directory: {}", e),
+                code: Some("read_error".to_string()),
+            })? {
                 let entry = entry.map_err(|e| ToolError {
                     message: format!("Failed to read entry: {}", e),
                     code: Some("read_error".to_string()),
                 })?;
-                
+
                 let entry_path = entry.path();
                 let file_type = if entry_path.is_dir() { "DIR" } else { "FILE" };
                 results.push(format!("{} [{}]", entry_path.display(), file_type));
+                if results.len() >= max_entries {
+                    break;
+                }
             }
         }
-        
+
+        results.sort();
+        let mut metadata = HashMap::new();
+        metadata.insert("count".to_string(), serde_json::json!(results.len()));
+        metadata.insert("max_entries".to_string(), serde_json::json!(max_entries));
+        metadata.insert("recursive".to_string(), serde_json::json!(recursive));
+
         Ok(ToolOutput {
             output_type: "text".to_string(),
             content: results.join("\n"),
-            metadata: std::collections::HashMap::new(),
+            metadata,
         })
     }
 }

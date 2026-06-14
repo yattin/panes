@@ -66,8 +66,7 @@ pub struct PluginSettings {
 
 impl Default for Settings {
     fn default() -> Self {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let config_dir = home.join(".claude-code");
+        let config_dir = crate::utils::config_dir();
 
         Self {
             api: ApiConfig::default(),
@@ -99,8 +98,7 @@ impl Default for Settings {
 impl Settings {
     /// Load settings from file
     pub fn load() -> anyhow::Result<Self> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let config_path = home.join(".claude-code").join("settings.json");
+        let config_path = crate::utils::config_dir().join("settings.json");
 
         if config_path.exists() {
             let content = std::fs::read_to_string(&config_path)?;
@@ -115,21 +113,20 @@ impl Settings {
 
     /// Save settings to file
     pub fn save(&self) -> anyhow::Result<()> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let config_dir = home.join(".claude-code");
+        let config_dir = crate::utils::config_dir();
         std::fs::create_dir_all(&config_dir)?;
-        
+
         let config_path = config_dir.join("settings.json");
         let content = serde_json::to_string_pretty(self)?;
         std::fs::write(&config_path, content)?;
-        
+
         Ok(())
     }
 
     /// Set a configuration value
     pub fn set(key: &str, value: &str) -> anyhow::Result<()> {
         let mut settings = Self::load()?;
-        
+
         match key {
             "model" => settings.model = value.to_string(),
             "verbose" => settings.verbose = value.parse().unwrap_or(false),
@@ -142,7 +139,7 @@ impl Settings {
             "voice.enabled" => settings.voice.enabled = value.parse().unwrap_or(false),
             _ => return Err(anyhow::anyhow!("Unknown setting: {}", key)),
         }
-        
+
         settings.save()?;
         Ok(())
     }

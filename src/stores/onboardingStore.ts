@@ -13,11 +13,13 @@ export const ONBOARDING_WORKFLOW_KEY = "panes.onboarding.workflow.v1";
 export const ONBOARDING_CHAT_ENGINES_KEY = "panes.onboarding.chatEngines.v1";
 
 const CHAT_ENGINE_ORDER: OnboardingChatEngineId[] = [
+  "claude-code-native",
   "codex",
   "claude",
-  "claude-code-native",
   "opencode",
 ];
+
+const DEFAULT_CHAT_ENGINES: OnboardingChatEngineId[] = ["claude-code-native"];
 
 export interface OnboardingInstallLogEntry {
   dep: string;
@@ -123,8 +125,8 @@ function normalizeChatEngines(values: Iterable<unknown>): OnboardingChatEngineId
 function readChatEngines(): OnboardingChatEngineId[] {
   try {
     const raw = localStorage.getItem(ONBOARDING_CHAT_ENGINES_KEY);
-    if (!raw) {
-      return [];
+    if (raw === null) {
+      return [...DEFAULT_CHAT_ENGINES];
     }
 
     const parsed = JSON.parse(raw) as unknown;
@@ -140,10 +142,6 @@ function readChatEngines(): OnboardingChatEngineId[] {
 
 function writeChatEngines(engines: OnboardingChatEngineId[]): void {
   try {
-    if (engines.length === 0) {
-      localStorage.removeItem(ONBOARDING_CHAT_ENGINES_KEY);
-      return;
-    }
     localStorage.setItem(
       ONBOARDING_CHAT_ENGINES_KEY,
       JSON.stringify(normalizeChatEngines(engines)),

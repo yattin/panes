@@ -5,7 +5,7 @@
 <h1 align="center">Panes</h1>
 
 <p align="center">
-  <a href="./README.md">English</a> &bull; <strong>Português (Brasil)</strong>
+  <a href="./README.md">English</a> &bull; <strong>Português (Brasil)</strong> &bull; <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">

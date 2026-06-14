@@ -5,7 +5,7 @@
 <h1 align="center">Panes</h1>
 
 <p align="center">
-  <strong>English</strong> &bull; <a href="./README.pt-BR.md">Português (Brasil)</a>
+  <strong>English</strong> &bull; <a href="./README.pt-BR.md">Português (Brasil)</a> &bull; <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -237,7 +237,7 @@ User-facing frontend copy is localized with `i18next`/`react-i18next`. Treat i18
 
 Panes uses a React + Zustand frontend running inside a Tauri shell, with a Rust backend that owns persistence, engine orchestration, git operations, terminal management, and filesystem-safe file access.
 
-The app currently exposes Codex, Claude (sidecar), Claude Code (Native), and OpenCode as chat engines. Codex talks to `codex app-server`; Claude is bridged through the bundled Claude runtime sidecar; Claude Code (Native) embeds the vendored `claude-code-rust` crate directly in the backend.
+The app currently exposes Native, Codex, Claude (sidecar), and OpenCode as chat engines. Native is the default and embeds the vendored `claude-code-rust` crate directly in the backend; Codex talks to `codex app-server`; Claude is bridged through the bundled Claude runtime sidecar.
 
 ### Stack
 

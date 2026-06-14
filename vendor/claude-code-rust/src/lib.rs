@@ -43,8 +43,8 @@ pub mod i18n;
 
 pub use cli::Cli;
 pub use state::AppState;
-pub use tools::ToolRegistry;
-pub use api::{ApiClient, AnthropicClient, ChatMessage};
+pub use tools::{ToolError, ToolRegistry};
+pub use api::{AnthropicClient, ApiClient, ChatMessage, ChatResponse, ToolDefinition};
 pub use config::Settings;
 pub use mcp::McpManager;
 pub use voice::VoiceInput;

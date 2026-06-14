@@ -8,12 +8,11 @@
 //!   2. Sessions: transcript count with mtime > lastConsolidatedAt >= minSessions
 //!   3. Lock: no other process mid-consolidation
 
-use chrono::{DateTime, Utc, Duration};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 use crate::state::AppState;
 
@@ -89,14 +88,14 @@ impl AutoDreamService {
         }
 
         let mut consolidation = self.consolidation_state.write().await;
-        
+
         if consolidation.is_consolidating {
             return Ok(false);
         }
 
         let now = Utc::now();
         let hours_since = (now - consolidation.last_consolidated_at).num_hours();
-        
+
         if hours_since < self.config.min_hours {
             return Ok(false);
         }
@@ -108,8 +107,10 @@ impl AutoDreamService {
 
         consolidation.last_session_scan = now;
 
-        let sessions = self.count_recent_sessions(&consolidation.last_consolidated_at).await?;
-        
+        let sessions = self
+            .count_recent_sessions(&consolidation.last_consolidated_at)
+            .await?;
+
         if sessions < self.config.min_sessions {
             return Ok(false);
         }
@@ -119,7 +120,7 @@ impl AutoDreamService {
         }
 
         drop(consolidation);
-        
+
         self.run_consolidation().await?;
 
         let mut consolidation = self.consolidation_state.write().await;
@@ -131,16 +132,15 @@ impl AutoDreamService {
     }
 
     async fn count_recent_sessions(&self, since: &DateTime<Utc>) -> anyhow::Result<usize> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let sessions_dir = home.join(".claude-code").join("sessions");
-        
+        let sessions_dir = crate::utils::config_dir().join("sessions");
+
         if !sessions_dir.exists() {
             return Ok(0);
         }
 
         let mut count = 0;
         let entries = std::fs::read_dir(&sessions_dir)?;
-        
+
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "json") {
@@ -158,10 +158,12 @@ impl AutoDreamService {
         Ok(count)
     }
 
-    async fn try_acquire_lock(&self, consolidation: &mut ConsolidationState) -> anyhow::Result<bool> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let lock_path = home.join(".claude-code").join(".consolidation.lock");
-        
+    async fn try_acquire_lock(
+        &self,
+        consolidation: &mut ConsolidationState,
+    ) -> anyhow::Result<bool> {
+        let lock_path = crate::utils::config_dir().join(".consolidation.lock");
+
         if lock_path.exists() {
             let content = std::fs::read_to_string(&lock_path)?;
             if let Ok(lock_time) = chrono::DateTime::parse_from_rfc3339(&content) {
@@ -179,28 +181,30 @@ impl AutoDreamService {
 
     async fn run_consolidation(&self) -> anyhow::Result<()> {
         println!("🌙 AutoDream: Starting memory consolidation...");
-        
+
         let memories = self.load_memories().await?;
-        
+
         if memories.is_empty() {
             println!("🌙 AutoDream: No memories to consolidate");
             return Ok(());
         }
 
         let consolidated = self.analyze_and_consolidate(&memories).await?;
-        
+
         self.save_consolidated_memories(&consolidated).await?;
-        
-        println!("🌙 AutoDream: Consolidated {} memories into {} insights", 
-                 memories.len(), consolidated.len());
+
+        println!(
+            "🌙 AutoDream: Consolidated {} memories into {} insights",
+            memories.len(),
+            consolidated.len()
+        );
 
         Ok(())
     }
 
     async fn load_memories(&self) -> anyhow::Result<Vec<MemoryEntry>> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let memory_path = home.join(".claude-code").join("memory.json");
-        
+        let memory_path = crate::utils::config_dir().join("memory.json");
+
         if !memory_path.exists() {
             return Ok(Vec::new());
         }
@@ -210,11 +214,14 @@ impl AutoDreamService {
         Ok(memories)
     }
 
-    async fn analyze_and_consolidate(&self, memories: &[MemoryEntry]) -> anyhow::Result<Vec<ConsolidatedInsight>> {
+    async fn analyze_and_consolidate(
+        &self,
+        memories: &[MemoryEntry],
+    ) -> anyhow::Result<Vec<ConsolidatedInsight>> {
         let mut insights: Vec<ConsolidatedInsight> = Vec::new();
-        
+
         let mut topic_groups: HashMap<String, Vec<&MemoryEntry>> = HashMap::new();
-        
+
         for memory in memories {
             let topic = self.extract_topic(&memory.content);
             topic_groups.entry(topic).or_default().push(memory);
@@ -248,10 +255,12 @@ impl AutoDreamService {
         )
     }
 
-    async fn save_consolidated_memories(&self, insights: &[ConsolidatedInsight]) -> anyhow::Result<()> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let consolidated_path = home.join(".claude-code").join("consolidated_memories.json");
-        
+    async fn save_consolidated_memories(
+        &self,
+        insights: &[ConsolidatedInsight],
+    ) -> anyhow::Result<()> {
+        let consolidated_path = crate::utils::config_dir().join("consolidated_memories.json");
+
         let existing = if consolidated_path.exists() {
             let content = std::fs::read_to_string(&consolidated_path)?;
             serde_json::from_str::<Vec<ConsolidatedInsight>>(&content)?
@@ -269,9 +278,8 @@ impl AutoDreamService {
     }
 
     async fn save_state(&self, state: &ConsolidationState) -> anyhow::Result<()> {
-        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let state_path = home.join(".claude-code").join(".autodream_state.json");
-        
+        let state_path = crate::utils::config_dir().join(".autodream_state.json");
+
         let content = serde_json::to_string_pretty(state)?;
         std::fs::write(&state_path, content)?;
 

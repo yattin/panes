@@ -1576,7 +1576,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   const [commandPanelBusy, setCommandPanelBusy] = useState(false);
   const [commandPanelError, setCommandPanelError] = useState<string | null>(null);
   const commandPanelBusyRef = useRef(false);
-  const [selectedEngineId, setSelectedEngineId] = useState("codex");
+  const [selectedEngineId, setSelectedEngineId] = useState("claude-code-native");
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [selectedEffort, setSelectedEffort] = useState("medium");
   const selectedEngineIdRef = useRef(selectedEngineId);

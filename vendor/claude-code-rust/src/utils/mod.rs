@@ -11,12 +11,12 @@ pub fn home_dir() -> PathBuf {
 
 /// Get the config directory
 pub fn config_dir() -> PathBuf {
-    home_dir().join(".claude-code")
+    home_dir().join(".panes-agent")
 }
 
 /// Get the data directory
 pub fn data_dir() -> PathBuf {
-    home_dir().join(".claude-code").join("data")
+    config_dir().join("data")
 }
 
 /// Ensure a directory exists
@@ -32,7 +32,7 @@ pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
-    
+
     if bytes >= GB {
         format!("{:.2} GB", bytes as f64 / GB as f64)
     } else if bytes >= MB {

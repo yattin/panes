@@ -1,6 +1,8 @@
 //! Tests for Skills Framework
 
-use claude_code_rs::skills::{SkillRegistry, SkillExecutor, SkillContext, SkillCategory, BuiltinSkills};
+use claude_code_rs::skills::{
+    BuiltinSkills, SkillCategory, SkillContext, SkillExecutor, SkillRegistry,
+};
 use std::sync::Arc;
 
 #[test]
@@ -123,7 +125,10 @@ fn test_skill_parameter_parsing() {
 
     // Parse input with flags
     let params = executor.parse_input("--message=\"test message\" --verbose");
-    assert_eq!(params.named_params.get("message"), Some(&"test message".to_string()));
+    assert_eq!(
+        params.named_params.get("message"),
+        Some(&"test message".to_string())
+    );
     assert!(params.flags.contains_key("verbose"));
 
     // Parse input with positional args

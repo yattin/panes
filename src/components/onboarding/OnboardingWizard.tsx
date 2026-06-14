@@ -68,12 +68,12 @@ const CHAT_ENGINE_OPTIONS: Array<{
   id: OnboardingChatEngineId;
   descriptionKey: string;
 }> = [
-  { id: "codex", descriptionKey: "chatEngines.options.codex.description" },
-  { id: "claude", descriptionKey: "chatEngines.options.claude.description" },
   {
     id: "claude-code-native",
     descriptionKey: "chatEngines.options.claudeCodeNative.description",
   },
+  { id: "codex", descriptionKey: "chatEngines.options.codex.description" },
+  { id: "claude", descriptionKey: "chatEngines.options.claude.description" },
   { id: "opencode", descriptionKey: "chatEngines.options.opencode.description" },
 ];
 
@@ -84,7 +84,7 @@ function chatEngineLabel(engineId: OnboardingChatEngineId): string {
     case "claude":
       return "Claude";
     case "claude-code-native":
-      return "Claude Code (Native)";
+      return "Native";
     case "opencode":
       return "OpenCode";
   }

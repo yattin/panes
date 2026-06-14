@@ -1,15 +1,13 @@
 //! Web Server Main Entry Point - Plugin Marketplace Web Interface
 
-use claude_code_rs::web::{WebServer, start_server};
+use claude_code_rs::web::{start_server, WebServer};
 use tracing::{info, Level};
 use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     let port = std::env::var("PORT")
         .ok()

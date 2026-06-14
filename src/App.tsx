@@ -93,7 +93,7 @@ function resolveAgentDisplayName(engineId: ChatEngineId): string {
     case "claude":
       return "Claude";
     case "claude-code-native":
-      return "Claude Code (Native)";
+      return "Native";
     case "opencode":
       return "OpenCode";
     case "codex":

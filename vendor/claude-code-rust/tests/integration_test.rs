@@ -3,9 +3,9 @@
 use claude_code_rs::{
     cli::Cli,
     config::Settings,
+    skills::{BuiltinSkills, SkillCategory, SkillContext, SkillExecutor, SkillRegistry},
     state::AppState,
     tools::ToolRegistry,
-    skills::{SkillRegistry, SkillExecutor, SkillContext, BuiltinSkills, SkillCategory},
 };
 use std::sync::Arc;
 
@@ -85,8 +85,8 @@ async fn test_skill_system_integration() {
 fn test_lib_exports() {
     // Verify all public types are exported
     use claude_code_rs::{
-        Skill, SkillRegistry, SkillExecutor, SkillContext, SkillParams,
-        SkillResult, SkillError, SkillCategory
+        Skill, SkillCategory, SkillContext, SkillError, SkillExecutor, SkillParams, SkillRegistry,
+        SkillResult,
     };
     // If this compiles, exports are correct
 }
@@ -98,30 +98,45 @@ async fn test_new_tools_functionality() {
     let registry = ToolRegistry::new();
 
     // Test git status
-    let git_result = registry.execute("git_operations", json!({
-        "operation": "status"
-    })).await;
+    let git_result = registry
+        .execute(
+            "git_operations",
+            json!({
+                "operation": "status"
+            }),
+        )
+        .await;
 
     // May fail if not in git repo, but should not panic
     let _ = git_result;
 
     // Test task creation
-    let task_result = registry.execute("task_management", json!({
-        "operation": "create",
-        "subject": "Integration Test Task",
-        "description": "Testing task management tool",
-        "priority": "high"
-    })).await;
+    let task_result = registry
+        .execute(
+            "task_management",
+            json!({
+                "operation": "create",
+                "subject": "Integration Test Task",
+                "description": "Testing task management tool",
+                "priority": "high"
+            }),
+        )
+        .await;
 
     assert!(task_result.is_ok(), "Task creation should succeed");
 
     // Test note creation
-    let note_result = registry.execute("note_edit", json!({
-        "operation": "create",
-        "title": "Integration Test Note",
-        "content": "Testing note edit tool",
-        "tags": ["test", "integration"]
-    })).await;
+    let note_result = registry
+        .execute(
+            "note_edit",
+            json!({
+                "operation": "create",
+                "title": "Integration Test Note",
+                "content": "Testing note edit tool",
+                "tags": ["test", "integration"]
+            }),
+        )
+        .await;
 
     assert!(note_result.is_ok(), "Note creation should succeed");
 }

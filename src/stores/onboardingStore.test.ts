@@ -105,7 +105,7 @@ describe("onboardingStore", () => {
       completed: false,
       legacyCompleted: true,
       preferredWorkflow: null,
-      selectedChatEngines: [],
+      selectedChatEngines: ["claude-code-native"],
     });
   });
 

@@ -27,7 +27,7 @@
   "chatEngines": {
     "title": "选择您的聊天工具",
     "subtitle": "选择您想在 Panes 聊天中准备好的工具。",
-    "helper": "您可以选择 Codex、Claude、Claude Code（内置）、OpenCode 或任意组合。下一步将在继续之前检查每个选定的运行时。",
+    "helper": "您可以选择 Native、Codex、Claude、OpenCode 或任意组合。下一步将在继续之前检查每个选定的运行时。",
     "options": {
       "codex": {
         "description": "由 Codex App Server 提供支持的聊天。如果缺少 Node.js 和 Codex CLI，可能会安装它们。"

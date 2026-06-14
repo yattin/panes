@@ -49,6 +49,16 @@ pub struct CliArgs {
     pub command: Option<Commands>,
 }
 
+impl CliArgs {
+    pub fn parse_from<I, T>(itr: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        <Self as Parser>::parse_from(itr)
+    }
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start an interactive REPL session
