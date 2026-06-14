@@ -1,0 +1,3 @@
+[submodule "vendor/free-code"]
+	path = vendor/free-code
+	url = https://github.com/freecodexyz/free-code.git
