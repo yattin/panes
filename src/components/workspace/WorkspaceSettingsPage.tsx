@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
+  Clapperboard,
   FolderGit2,
   FolderOpen,
   GitBranch,
@@ -20,9 +21,10 @@ import { toast } from "../../stores/toastStore";
 import { Dropdown } from "../shared/Dropdown";
 import { WorkspaceStartupSection } from "./WorkspaceStartupSection";
 import { GitRemotesView } from "../git/GitRemotesView";
+import { CueLightProjectPicker } from "../cuelight/CueLightProjectPicker";
 import type { Repo, TrustLevel } from "../../types";
 
-type Section = "general" | "repos" | "startup";
+type Section = "general" | "repos" | "startup" | "cuelight";
 
 const MIN_SCAN_DEPTH = 0;
 const MAX_SCAN_DEPTH = 12;
@@ -257,6 +259,14 @@ export function WorkspaceSettingsPage() {
               <Play size={13} />
               {t("nav.startup")}
             </button>
+            <button
+              type="button"
+              className={`wsp-nav-item ${section === "cuelight" ? "wsp-nav-active" : ""}`}
+              onClick={() => setSection("cuelight")}
+            >
+              <Clapperboard size={13} />
+              CueLight
+            </button>
           </div>
 
           {/* Content */}
@@ -448,6 +458,10 @@ export function WorkspaceSettingsPage() {
 
             {section === "startup" && (
               <WorkspaceStartupSection workspace={workspace} />
+            )}
+
+            {section === "cuelight" && workspace && (
+              <CueLightProjectPicker workspaceId={workspace.id} />
             )}
           </div>
         </div>

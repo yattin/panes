@@ -21,6 +21,8 @@ use crate::engines::{
     ApprovalRequestRoute, Engine, EngineEvent, EngineThread, ModelInfo, SandboxPolicy, ThreadScope,
     TurnInput,
 };
+use crate::engines::cuelight_tools::{CueLightThreadContext, build_cuelight_tool_definitions, execute_cuelight_tool, build_cuelight_system_prompt};
+use crate::db::workspaces::get_cuelight_binding_by_root;
 
 /// 工具输出回喂给 LLM 时的最大长度（字节），避免单次读取撑爆上下文。
 const MAX_TOOL_OUTPUT_BYTES: usize = 64 * 1024;
@@ -42,6 +44,8 @@ struct ThreadState {
     tasks: Option<Arc<TaskManagementTool>>,
     /// 用户在审批中选择 accept_for_session 后置 true，后续 execute_command 自动放行。
     auto_approve_commands: bool,
+    /// CueLight 影视模式上下文（从 workspace 绑定加载）
+    cuelight_context: Option<CueLightThreadContext>,
 }
 
 impl Default for ThreadState {
@@ -53,6 +57,7 @@ impl Default for ThreadState {
             sandbox_mode: None,
             tasks: None,
             auto_approve_commands: false,
+            cuelight_context: None,
         }
     }
 }
@@ -65,6 +70,8 @@ pub struct ClaudeCodeNativeEngine {
     threads: Arc<Mutex<HashMap<String, ThreadState>>>,
     /// 待处理的命令审批：approval_id -> oneshot sender。respond_to_approval 唤醒。
     pending_approvals: Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>,
+    /// 数据库引用（用于加载 CueLight 绑定）
+    db: Option<crate::db::Database>,
 }
 
 impl Default for ClaudeCodeNativeEngine {
@@ -78,7 +85,13 @@ impl ClaudeCodeNativeEngine {
         Self {
             threads: Arc::new(Mutex::new(HashMap::new())),
             pending_approvals: Arc::new(Mutex::new(HashMap::new())),
+            db: None,
         }
+    }
+
+    /// 设置数据库引用（用于加载 CueLight 绑定）
+    pub fn set_db(&mut self, db: crate::db::Database) {
+        self.db = Some(db);
     }
 
     /// 构造 ApiClient，优先使用 claude-code-rust 的已保存配置，
@@ -104,7 +117,18 @@ impl ClaudeCodeNativeEngine {
         root_path: Option<&Path>,
         allow_writes: bool,
         plan_mode: bool,
+        cuelight_context: Option<&CueLightThreadContext>,
     ) -> String {
+        // CueLight 影视模式 — 完整替换
+        if let Some(ctx) = cuelight_context {
+            let mut prompt = build_cuelight_system_prompt(ctx);
+            if plan_mode {
+                prompt.push_str("\n\nPlan mode is ON: only produce a plan, do not attempt to execute edits or commands.");
+            }
+            return prompt;
+        }
+
+        // 原有编程模式逻辑
         let mut parts = Vec::new();
         if let Some(root) = root_path {
             parts.push(format!(
@@ -147,7 +171,20 @@ impl ClaudeCodeNativeEngine {
 
     /// 暴露给 LLM 的工具定义。`allow_writes=false`（read-only 沙箱）时仅含读取/搜索/task 工具，
     /// 不暴露写工具与 execute_command，避免它尝试注定被拒的操作。
-    fn build_tool_definitions(allow_writes: bool) -> Vec<ToolDefinition> {
+    /// 如果存在 CueLight 绑定，则只暴露影视工具。
+    fn build_tool_definitions(
+        allow_writes: bool,
+        cuelight_context: Option<&CueLightThreadContext>,
+    ) -> Vec<ToolDefinition> {
+        // CueLight 影视模式 — 只暴露影视工具
+        if let Some(_ctx) = cuelight_context {
+            return build_cuelight_tool_definitions()
+                .into_iter()
+                .filter_map(|v| serde_json::from_value::<ToolDefinition>(v).ok())
+                .collect();
+        }
+
+        // 原有编程模式工具
         let mut raw = vec![
             FileReadTool::new().tool_definition(),
             ListFilesTool::new().tool_definition(),
@@ -214,7 +251,17 @@ impl ClaudeCodeNativeEngine {
         root: Option<&Path>,
         sandbox_mode: Option<&str>,
         tasks: Option<&TaskManagementTool>,
+        cuelight_context: Option<&CueLightThreadContext>,
     ) -> (bool, String) {
+        // CueLight 工具处理
+        if name.starts_with("cuelight_") {
+            if let Some(ctx) = cuelight_context {
+                return execute_cuelight_tool(name, args, ctx).await;
+            } else {
+                return (false, "CueLight tools are not available: no CueLight binding for this workspace".to_string());
+            }
+        }
+
         let writes_disabled = sandbox_mode == Some("read-only");
         match name {
             "file_read" => {
@@ -580,10 +627,37 @@ impl Engine for ClaudeCodeNativeEngine {
 
         let root_path = Self::root_path_from_scope(&scope);
 
+        // 尝试从数据库加载 CueLight 绑定
+        let cuelight_context: Option<CueLightThreadContext> = if let Some(ref db) = self.db {
+            if let Some(ref root) = root_path {
+                let root_str = root.to_string_lossy().to_string();
+                let db_clone = db.clone();
+                let binding: Option<crate::models::CueLightBindingDto> = tokio::task::spawn_blocking(move || {
+                    get_cuelight_binding_by_root(&db_clone, &root_str)
+                        .ok()
+                        .flatten()
+                })
+                .await
+                .ok()
+                .flatten();
+
+                if let Some(binding) = binding {
+                    CueLightThreadContext::from_binding(&binding).await.ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let mut guard = self.threads.lock().await;
         let state = guard.entry(thread_id.clone()).or_default();
         state.root_path = root_path.clone();
         state.sandbox_mode = sandbox.sandbox_mode.clone();
+        state.cuelight_context = cuelight_context;
         // 有工作目录时为该会话分配独立的任务列表。
         if root_path.is_some() {
             state.tasks = Some(Arc::new(TaskManagementTool::new()));
@@ -612,8 +686,8 @@ impl Engine for ClaudeCodeNativeEngine {
             })
             .await;
 
-        // 取出历史并追加本轮用户消息；同时取出工作目录、线程模型、沙箱模式、任务列表与审批标志。
-        let (mut history, root_path, thread_model, sandbox_mode, tasks, mut auto_approve_commands) = {
+        // 取出历史并追加本轮用户消息；同时取出工作目录、线程模型、沙箱模式、任务列表、审批标志与 CueLight 上下文。
+        let (mut history, root_path, thread_model, sandbox_mode, tasks, mut auto_approve_commands, cuelight_context) = {
             let mut guard = self.threads.lock().await;
             let state = guard.entry(engine_thread_id.to_string()).or_default();
             state.history.push(ClaudeChatMessage::user(input.message.clone()));
@@ -624,12 +698,18 @@ impl Engine for ClaudeCodeNativeEngine {
                 state.sandbox_mode.clone(),
                 state.tasks.clone(),
                 state.auto_approve_commands,
+                state.cuelight_context.clone(),
             )
         };
 
         let root_ref = root_path.as_deref();
         let allow_writes = sandbox_mode.as_deref() != Some("read-only");
-        let system_prompt = Self::build_system_prompt(root_ref, allow_writes, input.plan_mode);
+        let system_prompt = Self::build_system_prompt(
+            root_ref,
+            allow_writes,
+            input.plan_mode,
+            cuelight_context.as_ref(),
+        );
 
         let model = thread_model
             .filter(|m| !m.is_empty())
@@ -637,9 +717,9 @@ impl Engine for ClaudeCodeNativeEngine {
             .unwrap_or_default();
         let client = Self::build_client(&model);
 
-        // 有工作目录时才挂工具；read-only 沙箱下不暴露写工具。无目录则纯文本。
-        let tool_defs: Vec<ToolDefinition> = if root_ref.is_some() {
-            Self::build_tool_definitions(allow_writes)
+        // 有工作目录或 CueLight 绑定时才挂工具；read-only 沙箱下不暴露写工具。无目录则纯文本。
+        let tool_defs: Vec<ToolDefinition> = if root_ref.is_some() || cuelight_context.is_some() {
+            Self::build_tool_definitions(allow_writes, cuelight_context.as_ref())
         } else {
             Vec::new()
         };
@@ -958,6 +1038,7 @@ impl Engine for ClaudeCodeNativeEngine {
                     root_ref,
                     sandbox_mode.as_deref(),
                     tasks.as_deref(),
+                    cuelight_context.as_ref(),
                 )
                 .await;
                 let duration_ms = started.elapsed().as_millis() as u64;

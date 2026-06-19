@@ -1,5 +1,6 @@
 pub mod app;
 pub mod chat;
+pub mod cuelight;
 pub mod engines;
 pub mod files;
 pub mod git;

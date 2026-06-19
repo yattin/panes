@@ -1,6 +1,20 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// ---------------------------------------------------------------------------
+// CueLight binding
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CueLightBindingDto {
+    pub project_id: String,
+    pub project_name: String,
+    pub bound_at: String,
+}
+
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceDto {
@@ -10,6 +24,8 @@ pub struct WorkspaceDto {
     pub scan_depth: i64,
     pub created_at: String,
     pub last_opened_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cue_light_binding: Option<CueLightBindingDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

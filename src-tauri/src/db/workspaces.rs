@@ -5,6 +5,7 @@ use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
 use crate::models::WorkspaceDto;
+use crate::models::CueLightBindingDto;
 use crate::path_utils;
 use crate::runtime_env;
 
@@ -60,7 +61,7 @@ pub fn upsert_workspace(
 pub fn list_workspaces(db: &Database) -> anyhow::Result<Vec<WorkspaceDto>> {
     let conn = db.connect()?;
     let mut stmt = conn.prepare(
-        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at
+        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at, cuelight_binding_json
      FROM workspaces
      WHERE archived_at IS NULL
      ORDER BY last_opened_at DESC",
@@ -79,7 +80,7 @@ pub fn list_workspaces(db: &Database) -> anyhow::Result<Vec<WorkspaceDto>> {
 pub fn list_archived_workspaces(db: &Database) -> anyhow::Result<Vec<WorkspaceDto>> {
     let conn = db.connect()?;
     let mut stmt = conn.prepare(
-        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at
+        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at, cuelight_binding_json
      FROM workspaces
      WHERE archived_at IS NOT NULL
      ORDER BY archived_at DESC",
@@ -343,12 +344,12 @@ pub fn set_git_repo_selection_configured(
     Ok(())
 }
 
-fn get_workspace_by_root(
+pub fn get_workspace_by_root(
     conn: &rusqlite::Connection,
     root_path: &str,
 ) -> anyhow::Result<WorkspaceDto> {
     conn.query_row(
-        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at
+        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at, cuelight_binding_json
      FROM workspaces
      WHERE root_path = ?1",
         params![root_path],
@@ -383,7 +384,7 @@ fn get_workspace_by_id_optional(
     workspace_id: &str,
 ) -> anyhow::Result<Option<WorkspaceDto>> {
     conn.query_row(
-        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at
+        "SELECT id, name, root_path, scan_depth, created_at, last_opened_at, cuelight_binding_json
      FROM workspaces
      WHERE id = ?1",
         params![workspace_id],
@@ -403,6 +404,9 @@ fn workspace_name_from_path(path: &str) -> String {
 
 fn map_workspace_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceDto> {
     let root_path = path_utils::normalize_windows_path_string(&row.get::<_, String>(2)?);
+    let cue_light_binding: Option<CueLightBindingDto> = row
+        .get::<_, Option<String>>(6)?
+        .and_then(|json| serde_json::from_str(&json).ok());
     Ok(WorkspaceDto {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -410,7 +414,75 @@ fn map_workspace_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkspaceDto> 
         scan_depth: row.get(3)?,
         created_at: row.get(4)?,
         last_opened_at: row.get(5)?,
+        cue_light_binding,
     })
+}
+
+// ---------------------------------------------------------------------------
+// CueLight binding
+// ---------------------------------------------------------------------------
+
+/// 根据工作区根路径获取 CueLight 绑定
+pub fn get_cuelight_binding_by_root(
+    db: &Database,
+    root_path: &str,
+) -> anyhow::Result<Option<CueLightBindingDto>> {
+    let conn = db.connect()?;
+    get_workspace_by_root(&conn, root_path)
+        .ok()
+        .map(|ws| ws.cue_light_binding)
+        .ok_or_else(|| anyhow::anyhow!("workspace not found"))
+}
+
+pub fn set_cuelight_binding(
+    db: &Database,
+    workspace_id: &str,
+    binding: &CueLightBindingDto,
+) -> anyhow::Result<()> {
+    let conn = db.connect()?;
+    let json = serde_json::to_string(binding)
+        .context("failed to serialize CueLight binding")?;
+    conn.execute(
+        "UPDATE workspaces SET cuelight_binding_json = ?2 WHERE id = ?1",
+        rusqlite::params![workspace_id, json],
+    )
+    .context("failed to update cuelight_binding_json")?;
+    Ok(())
+}
+
+pub fn clear_cuelight_binding(db: &Database, workspace_id: &str) -> anyhow::Result<()> {
+    let conn = db.connect()?;
+    conn.execute(
+        "UPDATE workspaces SET cuelight_binding_json = NULL WHERE id = ?1",
+        rusqlite::params![workspace_id],
+    )
+    .context("failed to clear cuelight_binding_json")?;
+    Ok(())
+}
+
+pub fn get_cuelight_binding(
+    db: &Database,
+    workspace_id: &str,
+) -> anyhow::Result<Option<CueLightBindingDto>> {
+    let conn = db.connect()?;
+    let json: Option<String> = conn
+        .query_row(
+            "SELECT cuelight_binding_json FROM workspaces WHERE id = ?1",
+            rusqlite::params![workspace_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .context("failed to query cuelight_binding_json")?
+        .flatten();
+
+    match json {
+        Some(s) if !s.is_empty() => {
+            let binding: CueLightBindingDto = serde_json::from_str(&s)
+                .context("failed to deserialize CueLight binding")?;
+            Ok(Some(binding))
+        }
+        _ => Ok(None),
+    }
 }
 
 #[cfg(test)]

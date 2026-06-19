@@ -48,6 +48,7 @@ import { createAndActivateWorkspaceThread } from "../../lib/newThreadActions";
 import { UpdateDialog } from "../onboarding/UpdateDialog";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { WorkspaceMoreMenu } from "../workspace/WorkspaceMoreMenu";
+import { CreateWorkspaceDialog } from "../cuelight/CreateWorkspaceDialog";
 import { normalizeSidebarCollapsedState } from "./sidebarCollapseState";
 import type { Thread, Workspace } from "../../types";
 
@@ -229,11 +230,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
     void refreshArchivedThreads(activeWorkspaceId);
   }, [activeWorkspaceId, refreshArchivedThreads]);
 
-  async function onOpenFolder() {
-    const selected = await open({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) return;
-    await openWorkspace(selected, readLegacyDefaultScanDepth());
-  }
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   async function onSelectThread(thread: Thread) {
     if (activeView !== "chat") setActiveView("chat");
@@ -466,7 +463,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
             title={t("app:sidebar.openWorkspace")}
             onClick={() => {
               if (activeView !== "chat") setActiveView("chat");
-              void onOpenFolder();
+              setCreateDialogOpen(true);
             }}
           >
             <Plus size={12} strokeWidth={2.2} />
@@ -1023,6 +1020,11 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
         >
           {error}
         </div>
+      )}
+
+      {/* Create workspace dialog */}
+      {createDialogOpen && (
+        <CreateWorkspaceDialog onClose={() => setCreateDialogOpen(false)} />
       )}
     </div>
   );

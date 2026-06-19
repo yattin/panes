@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Repo, TrustLevel, Workspace } from "../types";
+import type { CueLightProjectBinding, Repo, TrustLevel, Workspace } from "../types";
 import { ipc } from "../lib/ipc";
 import { useGitStore } from "./gitStore";
 import { useTerminalStore } from "./terminalStore";
@@ -31,6 +31,12 @@ interface WorkspaceState {
   setRepoTrustLevel: (repoId: string, trustLevel: TrustLevel) => Promise<void>;
   setAllReposTrustLevel: (trustLevel: TrustLevel) => Promise<void>;
   rescanWorkspace: (workspaceId: string, scanDepth?: number) => Promise<Workspace | null>;
+  bindCueLight: (workspaceId: string, binding: {
+    projectId: string;
+    projectName: string;
+  }) => Promise<void>;
+  unbindCueLight: (workspaceId: string) => Promise<void>;
+  getCueLightBinding: (workspaceId: string) => CueLightProjectBinding | null | undefined;
 }
 
 const LAST_WORKSPACE_KEY = "panes:lastActiveWorkspaceId";
@@ -424,5 +430,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } catch (error) {
       set({ error: String(error) });
     }
-  }
+  },
+  bindCueLight: async (workspaceId, binding) => {
+    await ipc.bindCueLightProject(workspaceId, binding);
+    const fresh = await ipc.getCueLightBinding(workspaceId);
+    set((state) => ({
+      workspaces: state.workspaces.map((w) =>
+        w.id === workspaceId ? { ...w, cueLightBinding: fresh } : w
+      ),
+    }));
+  },
+  unbindCueLight: async (workspaceId) => {
+    await ipc.unbindCueLightProject(workspaceId);
+    set((state) => ({
+      workspaces: state.workspaces.map((w) =>
+        w.id === workspaceId ? { ...w, cueLightBinding: null } : w
+      ),
+    }));
+  },
+  getCueLightBinding: (workspaceId) => {
+    return get().workspaces.find((w) => w.id === workspaceId)?.cueLightBinding;
+  },
 }));

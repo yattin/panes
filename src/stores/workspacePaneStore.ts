@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import type { LayoutMode } from "./terminalStore";
 
-export type WorkspacePaneSurfaceKind = "chat" | "terminal" | "editor";
+export type WorkspacePaneSurfaceKind =
+  | "chat" | "terminal" | "editor"          // 保留类型定义以兼容现有代码
+  | "overview" | "storyboard" | "assets";   // CueLight 影视模式
+
 export type WorkspacePaneSplitDirection = "horizontal" | "vertical";
 
 export interface WorkspacePaneTab {
@@ -66,7 +69,7 @@ interface WorkspacePaneState {
 
 const STORAGE_KEY = (workspaceId: string) => `panes:workspacePaneLayout:${workspaceId}`;
 const DEFAULT_SPLIT_RATIO = 0.66;
-const SURFACE_ORDER: WorkspacePaneSurfaceKind[] = ["chat", "terminal", "editor"];
+const SURFACE_ORDER: WorkspacePaneSurfaceKind[] = ["chat", "overview", "storyboard", "assets"];
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

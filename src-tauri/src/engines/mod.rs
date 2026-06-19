@@ -29,6 +29,7 @@ pub mod codex;
 pub mod codex_event_mapper;
 pub mod codex_protocol;
 pub mod codex_transport;
+pub mod cuelight_tools;
 pub mod events;
 pub mod opencode;
 
@@ -473,6 +474,18 @@ impl EngineManager {
             codex: Arc::new(CodexEngine::default()),
             claude: Arc::new(ClaudeSidecarEngine::default()),
             claude_code_native: Arc::new(ClaudeCodeNativeEngine::new()),
+            opencode: Arc::new(OpenCodeEngine::default()),
+        }
+    }
+
+    /// 创建引擎管理器并传入数据库引用（用于 CueLight 绑定加载）
+    pub fn with_db(db: crate::db::Database) -> Self {
+        let mut native_engine = ClaudeCodeNativeEngine::new();
+        native_engine.set_db(db);
+        Self {
+            codex: Arc::new(CodexEngine::default()),
+            claude: Arc::new(ClaudeSidecarEngine::default()),
+            claude_code_native: Arc::new(native_engine),
             opencode: Arc::new(OpenCodeEngine::default()),
         }
     }

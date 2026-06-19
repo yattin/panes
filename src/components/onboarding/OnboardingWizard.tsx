@@ -37,6 +37,7 @@ import { useOnboardingStore } from "../../stores/onboardingStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { getHarnessIcon } from "../shared/HarnessLogos";
+import { CueLightProjectPicker } from "../cuelight/CueLightProjectPicker";
 import type {
   DependencyReport,
   EngineHealth,
@@ -775,6 +776,7 @@ export function OnboardingWizard() {
   const [readiness, setReadiness] = useState<ReadinessState>(EMPTY_READINESS_STATE);
   const [stepDirection, setStepDirection] = useState<"forward" | "back">("forward");
   const [stepAnimKey, setStepAnimKey] = useState(0);
+  const [selectedCueLightProject, setSelectedCueLightProject] = useState<{ id: string; name: string } | null>(null);
 
   const visibleSteps = getVisibleSteps(preferredWorkflow);
   const currentStepIndex = visibleSteps.indexOf(step);
@@ -810,7 +812,7 @@ export function OnboardingWizard() {
           : step === "chatReadiness"
             ? chatReady
             : step === "workspace"
-              ? selectedWorkspaceId !== null && workspaceConfirmed
+              ? selectedWorkspaceId !== null && workspaceConfirmed && selectedCueLightProject !== null
               : true;
 
   const isGreeting = step === "greeting";
@@ -948,13 +950,22 @@ export function OnboardingWizard() {
     setConfirmedWorkspaceId(openedWorkspace.id);
   }
 
+  const bindCueLight = useWorkspaceStore((s) => s.bindCueLight);
+
   const handleFinish = useCallback(async () => {
     if (!selectedWorkspaceId || !preferredWorkflow || busy) return;
     if (selectedWorkspaceId !== activeWorkspaceId) await setActiveWorkspace(selectedWorkspaceId);
+    // 绑定 CueLight 项目
+    if (selectedCueLightProject) {
+      await bindCueLight(selectedWorkspaceId, {
+        projectId: selectedCueLightProject.id,
+        projectName: selectedCueLightProject.name,
+      });
+    }
     if (preferredWorkflow === "chat") await loadEngines();
     completeOnboarding();
     setActiveView(preferredWorkflow === "cli" ? "harnesses" : "chat");
-  }, [selectedWorkspaceId, preferredWorkflow, busy, activeWorkspaceId, setActiveWorkspace, loadEngines, completeOnboarding, setActiveView]);
+  }, [selectedWorkspaceId, preferredWorkflow, busy, activeWorkspaceId, setActiveWorkspace, loadEngines, completeOnboarding, setActiveView, selectedCueLightProject, bindCueLight]);
 
   /* ─── Keyboard ─── */
 
@@ -1431,6 +1442,13 @@ export function OnboardingWizard() {
                       {workspaceLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderOpen size={12} />}
                       {t("setup:actions.openFolder")}
                     </button>
+                  </div>
+
+                  {/* CueLight 项目选择 */}
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 12 }}>
+                    <CueLightProjectPicker
+                      onProjectSelected={(project) => setSelectedCueLightProject(project)}
+                    />
                   </div>
 
                   {workspaceError ? <StatusMessage tone="warning">{workspaceError}</StatusMessage> : null}

@@ -15,6 +15,9 @@ import {
   FilePen,
   MessageSquare,
   SquareTerminal,
+  LayoutDashboard,
+  Clapperboard,
+  ImageIcon,
   X,
 } from "lucide-react";
 import type { TFunction } from "i18next";
@@ -57,12 +60,39 @@ const LazyEditorWithExplorer = lazy(() =>
   })),
 );
 
+const LazyCueLightOverview = lazy(() =>
+  import("../cuelight/CueLightOverview").then((module) => ({
+    default: module.CueLightOverview,
+  })),
+);
+
+const LazyCueLightStoryboard = lazy(() =>
+  import("../cuelight/CueLightStoryboard").then((module) => ({
+    default: module.CueLightStoryboard,
+  })),
+);
+
+const LazyCueLightAssets = lazy(() =>
+  import("../cuelight/CueLightAssets").then((module) => ({
+    default: module.CueLightAssets,
+  })),
+);
+
 function SurfaceIcon({ kind, size = 13 }: { kind: WorkspacePaneSurfaceKind; size?: number }) {
   if (kind === "terminal") {
     return <SquareTerminal size={size} />;
   }
   if (kind === "editor") {
     return <FilePen size={size} />;
+  }
+  if (kind === "overview") {
+    return <LayoutDashboard size={size} />;
+  }
+  if (kind === "storyboard") {
+    return <Clapperboard size={size} />;
+  }
+  if (kind === "assets") {
+    return <ImageIcon size={size} />;
   }
   return <MessageSquare size={size} />;
 }
@@ -94,7 +124,8 @@ function positionForDropPlacement(placement: DropPlacement): "before" | "after" 
 }
 
 function isSurfaceKind(value: string | null | undefined): value is WorkspacePaneSurfaceKind {
-  return value === "chat" || value === "terminal" || value === "editor";
+  return value === "chat" || value === "terminal" || value === "editor"
+    || value === "overview" || value === "storyboard" || value === "assets";
 }
 
 function resolveDropPlacementFromRect(rect: DOMRect, clientX: number, clientY: number): DropPlacement {
@@ -872,8 +903,12 @@ function SurfaceView({
       }
     >
       {kind === "chat" && <LazyChatPanel embedded />}
+      {/* terminal/editor 分支保留作为 fallback，SURFACE_ORDER 固定影视模式后不会执行 */}
       {kind === "terminal" && <LazyTerminalPanel workspaceId={workspaceId} embedded />}
       {kind === "editor" && <LazyEditorWithExplorer embedded />}
+      {kind === "overview" && <LazyCueLightOverview />}
+      {kind === "storyboard" && <LazyCueLightStoryboard />}
+      {kind === "assets" && <LazyCueLightAssets />}
     </Suspense>
   );
 }

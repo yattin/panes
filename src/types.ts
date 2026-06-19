@@ -7,6 +7,13 @@ export interface Workspace {
   scanDepth: number;
   createdAt: string;
   lastOpenedAt: string;
+  cueLightBinding?: CueLightProjectBinding | null;
+}
+
+export interface CueLightProjectBinding {
+  projectId: string;
+  projectName: string;
+  boundAt: string;
 }
 
 export interface KeepAwakeState {

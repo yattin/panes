@@ -83,10 +83,10 @@ pub fn run() {
         db::workspaces::ensure_default_workspace(&db).expect("failed to ensure default workspace");
 
     let app_state = AppState {
-        db,
+        db: db.clone(),
         config: Arc::new(app_config),
         config_write_lock: Arc::new(tokio::sync::Mutex::new(())),
-        engines: Arc::new(EngineManager::new()),
+        engines: Arc::new(EngineManager::with_db(db)),
         git_watchers: Arc::new(GitWatcherManager::default()),
         terminals: Arc::new(TerminalManager::default()),
         notifications: Arc::new(terminal_notifications::TerminalNotificationManager::default()),
@@ -319,6 +319,11 @@ pub fn run() {
             commands::harness::check_harnesses,
             commands::harness::install_harness,
             commands::harness::launch_harness,
+            commands::cuelight::cuelight_proxy,
+            commands::cuelight::bind_cuelight_project,
+            commands::cuelight::unbind_cuelight_project,
+            commands::cuelight::get_cuelight_binding,
+            commands::cuelight::set_cuelight_auth_token,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

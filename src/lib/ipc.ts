@@ -66,7 +66,8 @@ import type {
   Thread,
   TrustLevel,
   WorkspaceGitSelectionStatus,
-  Workspace
+  Workspace,
+  CueLightProjectBinding,
 } from "../types";
 
 export const ipc = {
@@ -624,6 +625,26 @@ export const ipc = {
     invoke<InstallResult>("install_harness", { harnessId }),
   launchHarness: (harnessId: string) =>
     invoke<string>("launch_harness", { harnessId }),
+
+  // CueLight integration
+  cueLightProxy: (params: {
+    method: string;
+    serverUrl: string;
+    path: string;
+    authToken?: string | null;
+    body?: unknown;
+    query?: Record<string, string>;
+  }) => invoke<unknown>("cuelight_proxy", params),
+  bindCueLightProject: (workspaceId: string, binding: {
+    projectId: string;
+    projectName: string;
+  }) => invoke<void>("bind_cuelight_project", { workspaceId, binding }),
+  unbindCueLightProject: (workspaceId: string) =>
+    invoke<void>("unbind_cuelight_project", { workspaceId }),
+  getCueLightBinding: (workspaceId: string) =>
+    invoke<CueLightProjectBinding | null>("get_cuelight_binding", { workspaceId }),
+  setCueLightAuthToken: (token: string) =>
+    invoke<void>("set_cuelight_auth_token", { token }),
 };
 
 export async function listenThreadEvents(

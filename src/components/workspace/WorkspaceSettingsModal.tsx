@@ -9,6 +9,7 @@ import {
   Link,
   Play,
   RefreshCw,
+  Clapperboard,
   X,
 } from "lucide-react";
 import { ipc } from "../../lib/ipc";
@@ -18,9 +19,10 @@ import { toast } from "../../stores/toastStore";
 import { Dropdown } from "../shared/Dropdown";
 import { WorkspaceStartupSection } from "./WorkspaceStartupSection";
 import { GitRemotesView } from "../git/GitRemotesView";
+import { CueLightProjectPicker } from "../cuelight/CueLightProjectPicker";
 import type { Repo, TrustLevel, Workspace } from "../../types";
 
-type Section = "general" | "repos" | "startup";
+type Section = "general" | "repos" | "startup" | "cuelight";
 
 const MIN_SCAN_DEPTH = 0;
 const MAX_SCAN_DEPTH = 12;
@@ -247,6 +249,14 @@ export function WorkspaceSettingsModal({
             <Play size={13} className="ws-nav-icon" />
             {t("nav.startup")}
           </button>
+          <button
+            type="button"
+            className={`ws-nav-item ${section === "cuelight" ? "ws-nav-item-active" : ""}`}
+            onClick={() => setSection("cuelight")}
+          >
+            <Clapperboard size={13} className="ws-nav-icon" />
+            CueLight
+          </button>
         </div>
 
         <div className="ws-divider" />
@@ -428,6 +438,9 @@ export function WorkspaceSettingsModal({
 
           {section === "startup" && (
             <WorkspaceStartupSection workspace={currentWorkspace} />
+          )}
+          {section === "cuelight" && (
+            <CueLightProjectPicker workspaceId={currentWorkspace.id} />
           )}
         </div>
 

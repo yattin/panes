@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ThreeColumnLayout } from "./components/layout/ThreeColumnLayout";
 import { CommandPalette } from "./components/shared/CommandPalette";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
@@ -28,6 +28,8 @@ import { toast } from "./stores/toastStore";
 import type { ChatEngineId, RuntimeToast, Thread } from "./types";
 import { getActiveEditorView, openSearchPanel } from "./components/editor/CodeMirrorEditor";
 import { CustomWindowFrame } from "./components/shared/CustomWindowFrame";
+import { CueLightTokenGate } from "./components/cuelight/CueLightTokenGate";
+import { CreateWorkspaceDialog } from "./components/cuelight/CreateWorkspaceDialog";
 import { useCustomWindowFrameState } from "./lib/customWindowFrame";
 import { runEditMenuAction } from "./lib/nativeEditActions";
 import { createAndActivateWorkspaceThread } from "./lib/newThreadActions";
@@ -135,6 +137,15 @@ export function App() {
   const checkForUpdate = useUpdateStore((s) => s.checkForUpdate);
   const customWindowFrame = usesCustomWindowFrame();
   const customWindowFrameState = useCustomWindowFrameState();
+  const loading = useWorkspaceStore((s) => s.loading);
+
+  // 无工作区时自动弹出创建对话框
+  const [autoCreateDialogOpen, setAutoCreateDialogOpen] = useState(false);
+  useEffect(() => {
+    if (!loading && workspaces.length === 0) {
+      setAutoCreateDialogOpen(true);
+    }
+  }, [loading, workspaces.length]);
 
   useEffect(() => {
     void loadWorkspaces();
@@ -557,20 +568,24 @@ export function App() {
   }, []);
 
   return (
-    <div
-      className={`app-shell${customWindowFrame ? " app-shell-custom-frame" : ""}${
-        customWindowFrameState.isMaximized ? " app-shell-custom-frame-maximized" : ""
-      }${customWindowFrameState.isFullscreen ? " app-shell-custom-frame-fullscreen" : ""}`}
-    >
-      {customWindowFrame && <CustomWindowFrame frameState={customWindowFrameState} />}
-      <div className="app-shell-body">
-        <ThreeColumnLayout />
+    <CueLightTokenGate>
+      <div
+        className={`app-shell${customWindowFrame ? " app-shell-custom-frame" : ""}${
+          customWindowFrameState.isMaximized ? " app-shell-custom-frame-maximized" : ""
+        }${customWindowFrameState.isFullscreen ? " app-shell-custom-frame-fullscreen" : ""}`}
+      >
+        {customWindowFrame && <CustomWindowFrame frameState={customWindowFrameState} />}
+        <div className="app-shell-body">
+          <ThreeColumnLayout />
+        </div>
+        <CommandPalette open={commandPaletteOpen} onClose={closeCommandPalette} />
+        <PowerSettingsModal />
+        <TerminalNotificationSettingsModal />
+        <ToastContainer />
+        {autoCreateDialogOpen && (
+          <CreateWorkspaceDialog onClose={() => setAutoCreateDialogOpen(false)} />
+        )}
       </div>
-      <CommandPalette open={commandPaletteOpen} onClose={closeCommandPalette} />
-      <PowerSettingsModal />
-      <TerminalNotificationSettingsModal />
-      <OnboardingWizard />
-      <ToastContainer />
-    </div>
+    </CueLightTokenGate>
   );
 }
