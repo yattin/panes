@@ -73,8 +73,10 @@ const CHAT_ENGINE_OPTIONS: Array<{
     descriptionKey: "chatEngines.options.claudeCodeNative.description",
   },
   { id: "codex", descriptionKey: "chatEngines.options.codex.description" },
-  { id: "claude", descriptionKey: "chatEngines.options.claude.description" },
-  { id: "opencode", descriptionKey: "chatEngines.options.opencode.description" },
+  ...(__NON_NATIVE_HARNESSES__ ? [
+    { id: "claude" as const, descriptionKey: "chatEngines.options.claude.description" },
+    { id: "opencode" as const, descriptionKey: "chatEngines.options.opencode.description" },
+  ] : []),
 ];
 
 function chatEngineLabel(engineId: OnboardingChatEngineId): string {
@@ -980,9 +982,10 @@ export function OnboardingWizard() {
     ? getNodeManualGuidance(readiness.dependencyReport)
     : null;
   const openCodeInstallCommand = getHarnessInstallCommand("opencode");
-  const showOpenCodeInstallCard =
-    selectedChatEngines.includes("opencode") &&
-    shouldShowOpenCodeInstallCard(readiness.engineHealth.opencode);
+  const showOpenCodeInstallCard = __NON_NATIVE_HARNESSES__
+    ? selectedChatEngines.includes("opencode") &&
+      shouldShowOpenCodeInstallCard(readiness.engineHealth.opencode)
+    : false;
   const canInstallOpenCodeFromReadiness =
     readiness.dependencyReport?.node.found !== false && Boolean(openCodeInstallCommand);
 

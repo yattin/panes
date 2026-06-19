@@ -10,6 +10,7 @@ use crate::models::{DepStatus, DependencyReport, InstallProgressEvent, InstallRe
 use crate::process_utils;
 use crate::runtime_env;
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_SHELL_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ---------------------------------------------------------------------------

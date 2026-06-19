@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
@@ -258,9 +258,13 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
   }
 
   async function onCreateProjectThread(project: Workspace) {
-    const createdThreadId = await createAndActivateWorkspaceThread(project.id);
-    if (!createdThreadId) return;
-    setCollapsed((prev) => ({ ...prev, [project.id]: false }));
+    // Optimistic UI update — expand project and switch view immediately
+    startTransition(() => {
+      if (activeView !== "chat") setActiveView("chat");
+      setCollapsed((prev) => ({ ...prev, [project.id]: false }));
+    });
+    // Heavy IPC work happens in the background
+    await createAndActivateWorkspaceThread(project.id);
   }
 
   function onDeleteWorkspace(project: Workspace) {
@@ -521,6 +525,19 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
                         {project.threads.length}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      className="sb-project-new-thread"
+                      title={t("app:sidebar.newThread")}
+                      aria-label={t("app:sidebar.newThread")}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onCreateProjectThread(project.workspace);
+                      }}
+                    >
+                      <Plus size={12} />
+                    </button>
                     <WorkspaceMoreMenu
                       workspace={project.workspace}
                       onOpenSettings={() => openWorkspaceSettings(project.workspace.id)}

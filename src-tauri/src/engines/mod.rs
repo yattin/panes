@@ -493,7 +493,10 @@ impl EngineManager {
                 self.codex.runtime_model_fallback().await
             }
         };
+
+        #[cfg(feature = "non-native-harnesses")]
         let claude_models = self.claude.models();
+        #[cfg(feature = "non-native-harnesses")]
         let opencode_models = match timeout(
             Duration::from_secs(4),
             self.opencode.list_models_runtime(),
@@ -507,18 +510,13 @@ impl EngineManager {
             }
         };
 
-        Ok(vec![
+        #[allow(unused_mut)]
+        let mut engines = vec![
             EngineInfoDto {
                 id: self.codex.id().to_string(),
                 name: self.codex.name().to_string(),
                 models: codex_models.into_iter().map(map_model_info).collect(),
                 capabilities: map_engine_capabilities(capabilities_for_engine(self.codex.id())),
-            },
-            EngineInfoDto {
-                id: self.claude.id().to_string(),
-                name: self.claude.name().to_string(),
-                models: claude_models.into_iter().map(map_model_info).collect(),
-                capabilities: map_engine_capabilities(capabilities_for_engine(self.claude.id())),
             },
             EngineInfoDto {
                 id: self.claude_code_native.id().to_string(),
@@ -533,13 +531,25 @@ impl EngineManager {
                     self.claude_code_native.id(),
                 )),
             },
-            EngineInfoDto {
+        ];
+
+        #[cfg(feature = "non-native-harnesses")]
+        {
+            engines.push(EngineInfoDto {
+                id: self.claude.id().to_string(),
+                name: self.claude.name().to_string(),
+                models: claude_models.into_iter().map(map_model_info).collect(),
+                capabilities: map_engine_capabilities(capabilities_for_engine(self.claude.id())),
+            });
+            engines.push(EngineInfoDto {
                 id: self.opencode.id().to_string(),
                 name: self.opencode.name().to_string(),
                 models: opencode_models.into_iter().map(map_model_info).collect(),
                 capabilities: map_engine_capabilities(capabilities_for_engine(self.opencode.id())),
-            },
-        ])
+            });
+        }
+
+        Ok(engines)
     }
 
     pub async fn health(&self, engine_id: &str) -> anyhow::Result<EngineHealthDto> {

@@ -36,7 +36,9 @@ use power::KeepAwakeManager;
 use state::{AppState, TurnManager};
 #[cfg(target_os = "macos")]
 use tauri::menu::{AboutMetadata, MenuItem, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{image::Image, menu::Menu, Emitter, Manager, RunEvent, WebviewWindowBuilder};
+use tauri::{menu::Menu, Emitter, Manager, RunEvent, WebviewWindowBuilder};
+#[cfg(not(target_os = "windows"))]
+use tauri::image::Image;
 use terminal::TerminalManager;
 
 pub fn maybe_handle_cli_subcommand() -> anyhow::Result<bool> {

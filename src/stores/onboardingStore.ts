@@ -15,8 +15,7 @@ export const ONBOARDING_CHAT_ENGINES_KEY = "panes.onboarding.chatEngines.v1";
 const CHAT_ENGINE_ORDER: OnboardingChatEngineId[] = [
   "claude-code-native",
   "codex",
-  "claude",
-  "opencode",
+  ...(__NON_NATIVE_HARNESSES__ ? (["claude", "opencode"] as const) : []),
 ];
 
 const DEFAULT_CHAT_ENGINES: OnboardingChatEngineId[] = ["claude-code-native"];

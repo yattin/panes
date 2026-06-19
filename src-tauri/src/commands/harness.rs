@@ -9,6 +9,7 @@ use crate::models::{HarnessInfo, HarnessReport, InstallProgressEvent, InstallRes
 use crate::process_utils;
 use crate::runtime_env;
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_SHELL_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ---------------------------------------------------------------------------
@@ -30,7 +31,7 @@ struct HarnessDef {
     native: bool,
 }
 
-const HARNESSES: &[HarnessDef] = &[
+const NATIVE_HARNESSES: &[HarnessDef] = &[
     HarnessDef {
         id: "codex",
         name: "Codex CLI",
@@ -43,6 +44,10 @@ const HARNESSES: &[HarnessDef] = &[
         website: "https://github.com/openai/codex",
         native: true,
     },
+];
+
+#[cfg(feature = "non-native-harnesses")]
+const NON_NATIVE_HARNESSES: &[HarnessDef] = &[
     HarnessDef {
         id: "claude-code",
         name: "Claude Code",
@@ -117,6 +122,16 @@ const HARNESSES: &[HarnessDef] = &[
     },
 ];
 
+#[cfg(not(feature = "non-native-harnesses"))]
+fn all_harnesses() -> impl Iterator<Item = &'static HarnessDef> {
+    NATIVE_HARNESSES.iter()
+}
+
+#[cfg(feature = "non-native-harnesses")]
+fn all_harnesses() -> impl Iterator<Item = &'static HarnessDef> {
+    NATIVE_HARNESSES.iter().chain(NON_NATIVE_HARNESSES.iter())
+}
+
 // ---------------------------------------------------------------------------
 // check_harnesses
 // ---------------------------------------------------------------------------
@@ -125,7 +140,7 @@ const HARNESSES: &[HarnessDef] = &[
 pub async fn check_harnesses() -> Result<HarnessReport, String> {
     let mut harnesses = Vec::new();
 
-    for def in HARNESSES {
+    for def in all_harnesses() {
         let status = detect_harness(def).await;
         harnesses.push(status);
     }
@@ -145,8 +160,7 @@ pub async fn check_harnesses() -> Result<HarnessReport, String> {
 
 #[tauri::command]
 pub async fn install_harness(app: AppHandle, harness_id: String) -> Result<InstallResult, String> {
-    let def = HARNESSES
-        .iter()
+    let def = all_harnesses()
         .find(|h| h.id == harness_id)
         .ok_or_else(|| format!("unknown harness: {harness_id}"))?;
 
@@ -196,8 +210,7 @@ pub async fn install_harness(app: AppHandle, harness_id: String) -> Result<Insta
 
 #[tauri::command]
 pub async fn launch_harness(harness_id: String) -> Result<String, String> {
-    let def = HARNESSES
-        .iter()
+    let def = all_harnesses()
         .find(|h| h.id == harness_id)
         .ok_or_else(|| format!("unknown harness: {harness_id}"))?;
 
@@ -381,6 +394,7 @@ async fn run_harness_install(
 // Script-based install runner (curl-pipe installers)
 // ---------------------------------------------------------------------------
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 async fn run_harness_install_script(
     app: &AppHandle,
     harness_id: &str,

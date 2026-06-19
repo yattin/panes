@@ -29,6 +29,7 @@ use super::{
     ReasoningEffortOption, SandboxPolicy, ThreadScope, TurnCompletionStatus, TurnInput,
 };
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_SHELL_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const ARCHIVED_CLAUDE_SDK_NODE_MODULES: &str = "claude-sdk-node_modules.tar.gz";
 const SIDECAR_EVENT_BUFFER_CAPACITY: usize = 1024;

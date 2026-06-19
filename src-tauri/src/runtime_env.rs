@@ -9,14 +9,19 @@ use std::{
 use tokio::{
     process::Command,
     sync::OnceCell,
-    time::{timeout, Duration},
+    time::Duration,
 };
+#[cfg(not(target_os = "windows"))]
+use tokio::time::timeout;
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_ENV_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_ENV_PROBE_MARKER: &str = "__PANES_LOGIN_ENV_START__";
 
 static LOGIN_SHELL_ENV: OnceCell<HashMap<OsString, OsString>> = OnceCell::const_new();
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ShellFlavor {
     Bash,
@@ -28,6 +33,7 @@ enum ShellFlavor {
     Other,
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellLaunchSpec {
     pub program: PathBuf,
@@ -213,6 +219,7 @@ pub fn terminal_shell() -> PathBuf {
     )
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub fn terminal_shell_args(shell: &Path) -> Vec<String> {
     #[cfg(target_os = "windows")]
     {
@@ -234,6 +241,7 @@ pub fn terminal_shell_args(shell: &Path) -> Vec<String> {
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub fn command_shell_for_string(command: &str) -> ShellLaunchSpec {
     let program = command_shell_program();
     let args = command_shell_args_for(&program, command);
@@ -287,6 +295,7 @@ fn login_env_probe_shell_args(shell: &Path) -> Vec<String> {
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn parse_login_shell_env_output(stdout: &[u8]) -> HashMap<OsString, OsString> {
     let mut parsed = HashMap::new();
     let mut after_marker = false;
@@ -318,6 +327,7 @@ fn parse_login_shell_env_output(stdout: &[u8]) -> HashMap<OsString, OsString> {
     parsed
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn os_string_from_bytes(bytes: &[u8]) -> OsString {
     #[cfg(unix)]
     {
@@ -567,6 +577,7 @@ fn terminal_shell_for(
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn command_shell_program() -> PathBuf {
     #[cfg(target_os = "windows")]
     let shell_env = env::var("COMSPEC").ok();
@@ -580,6 +591,7 @@ fn command_shell_program() -> PathBuf {
     )
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn command_shell_program_for(
     shell_env: Option<&str>,
     home: Option<&Path>,
@@ -630,6 +642,7 @@ fn resolve_from_entries(binary: &str, entries: &[PathBuf]) -> Option<PathBuf> {
     which::which_in(binary, Some(joined), cwd).ok()
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn command_shell_args_for(program: &Path, command: &str) -> Vec<String> {
     match shell_flavor(program) {
         ShellFlavor::Bash | ShellFlavor::Zsh | ShellFlavor::Sh => {
@@ -642,6 +655,7 @@ fn command_shell_args_for(program: &Path, command: &str) -> Vec<String> {
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn shell_flavor(path: &Path) -> ShellFlavor {
     match path
         .file_name()
@@ -696,6 +710,7 @@ fn login_probe_shells_for(shell_env: Option<&str>, current_path: Option<&OsStr>)
         .collect()
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn resolve_shell_candidate(candidate: &str, entries: &[PathBuf]) -> Option<PathBuf> {
     let has_separator = candidate.contains('/') || candidate.contains('\\');
     if has_separator {

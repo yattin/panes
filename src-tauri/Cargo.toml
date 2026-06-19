@@ -59,6 +59,7 @@ core-foundation = "0.10"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+non-native-harnesses = []
 
 [profile.dev]
 # Keep local debug builds inspectable without letting `target/` explode as quickly.
