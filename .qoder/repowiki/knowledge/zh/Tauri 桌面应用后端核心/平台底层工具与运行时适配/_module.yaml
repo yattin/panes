@@ -1,0 +1,18 @@
+schema_version: 1
+module_path: backend/platform_utilities
+title: 平台底层工具与运行时适配
+scope:
+    - src-tauri/src/fs_ops.rs
+    - src-tauri/src/path_utils.rs
+    - src-tauri/src/process_utils.rs
+    - src-tauri/src/runtime_env.rs
+    - src-tauri/src/state.rs
+    - src-tauri/src/workspace_startup.rs
+    - src-tauri/src/locale.rs
+    - src-tauri/src/linux_appimage.rs
+    - src-tauri/src/linux_webkit.rs
+    - src-tauri/src/models.rs
+    - src-tauri/src/terminal_notifications.rs
+source_files: []
+depends_on: []
+related_to: []

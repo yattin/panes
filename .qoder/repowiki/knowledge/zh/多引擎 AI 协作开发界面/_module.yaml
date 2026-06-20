@@ -1,9 +1,10 @@
 schema_version: 1
 module_path: frontend
-title: AI 编程助手前端应用
+title: 多引擎 AI 协作开发界面
 scope:
     - src/
 source_files: []
 depends_on: []
 related_to:
     - path: backend
+    - path: landing_page
