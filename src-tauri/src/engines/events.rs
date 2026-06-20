@@ -131,6 +131,8 @@ pub enum EngineEvent {
         engine_action_id: Option<String>,
         action_type: ActionType,
         summary: String,
+        display_label: Option<String>,
+        display_subtitle: Option<String>,
         details: serde_json::Value,
     },
     ActionOutputDelta {

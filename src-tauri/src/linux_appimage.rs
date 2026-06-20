@@ -403,8 +403,8 @@ fn run_optional_command(command_name: &str, args: &[&std::ffi::OsStr]) {
 mod tests {
     use super::{
         desktop_entry_targets_installed_binary, ensure_appimage_desktop_integration_with_env,
-        escape_desktop_exec_arg, AppImageIntegrationEnv, AppImageIntegrationStatus, APP_ID,
-        DESKTOP_ENTRY_MARKER, DESKTOP_FILE_NAME,
+        escape_desktop_exec_arg, escape_desktop_string, AppImageIntegrationEnv,
+        AppImageIntegrationStatus, APP_ID, DESKTOP_ENTRY_MARKER, DESKTOP_FILE_NAME,
     };
     use std::{env, fs, path::PathBuf};
     use uuid::Uuid;
@@ -520,7 +520,10 @@ mod tests {
             "Exec={} %U",
             escape_desktop_exec_arg(&appimage_path)
         )));
-        assert!(desktop_entry.contains(&format!("TryExec={}", appimage_path.to_string_lossy())));
+        assert!(desktop_entry.contains(&format!(
+            "TryExec={}",
+            escape_desktop_string(&appimage_path.to_string_lossy())
+        )));
         assert!(!desktop_entry.contains("StartupWMClass="));
 
         for size in [32_u32, 64, 128, 256, 512] {
@@ -583,9 +586,15 @@ mod tests {
                 .expect("system entry should have parent"),
         )
         .expect("system applications dir should exist");
+        let installed_binary =
+            env::current_exe().expect("current test executable should be discoverable");
         fs::write(
             &system_entry,
-            "[Desktop Entry]\nName=Panes\nTryExec=/bin/sh\nExec=/bin/sh -c true\n",
+            format!(
+                "[Desktop Entry]\nName=Panes\nTryExec={}\nExec={} %U\n",
+                escape_desktop_string(&installed_binary.to_string_lossy()),
+                escape_desktop_exec_arg(&installed_binary)
+            ),
         )
         .expect("system desktop entry should be written");
 
@@ -649,10 +658,13 @@ mod tests {
         let desktop_entry = fs::read_to_string(paths.managed_desktop_entry())
             .expect("desktop entry should be readable");
         assert!(desktop_entry.contains(&format!(
-            "Exec=\"{}\" %U",
-            appimage_path.to_string_lossy().replace('%', "%%")
+            "Exec={} %U",
+            escape_desktop_exec_arg(&appimage_path)
         )));
-        assert!(desktop_entry.contains(&format!("TryExec={}", appimage_path.to_string_lossy())));
+        assert!(desktop_entry.contains(&format!(
+            "TryExec={}",
+            escape_desktop_string(&appimage_path.to_string_lossy())
+        )));
     }
 
     #[test]

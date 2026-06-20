@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod contexts;
 mod db;
 mod engines;
 mod fs_ops;
@@ -10,11 +11,14 @@ mod linux_webkit;
 mod locale;
 mod models;
 mod path_utils;
+#[path = "contexts/power_management/mod.rs"]
 mod power;
 mod process_utils;
 mod runtime_env;
 mod state;
+#[path = "contexts/terminal_session/mod.rs"]
 mod terminal;
+#[path = "contexts/notification_delivery/terminal_notifications.rs"]
 mod terminal_notifications;
 mod workspace_startup;
 

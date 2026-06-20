@@ -607,6 +607,20 @@ function ActionStatusBadge({ status }: { status: string }) {
   );
 }
 
+export function getActionBlockDisplayText(
+  block: Pick<ActionBlock, "summary" | "displayLabel" | "displaySubtitle">,
+): { label: string; subtitle: string | null } {
+  const label =
+    typeof block.displayLabel === "string" && block.displayLabel.trim()
+      ? block.displayLabel.trim()
+      : block.summary;
+  const subtitle =
+    typeof block.displaySubtitle === "string" && block.displaySubtitle.trim()
+      ? block.displaySubtitle.trim()
+      : null;
+  return { label, subtitle };
+}
+
 function ActionBlockView({
   block,
   onLoadDeferredOutput,
@@ -640,6 +654,7 @@ function ActionBlockView({
   const Icon = actionIcons[block.actionType] ?? Terminal;
   const isRunning = block.status === "running";
   const isPending = block.status === "pending";
+  const { label: displayLabel, subtitle: displaySubtitle } = getActionBlockDisplayText(block);
   const hasBody = outputChunks.length > 0 || Boolean(block.result?.error) || outputDeferred;
   const actionDetails = (block.details ?? {}) as Record<string, unknown>;
   const outputTruncated =
@@ -706,8 +721,15 @@ function ActionBlockView({
           />
         )}
         <Icon size={12} style={{ color: "var(--text-3)", flexShrink: 0 }} />
-        <span style={{ fontSize: 11.5, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {block.summary}
+        <span style={{ display: "flex", flexDirection: "column", gap: 1, flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <span style={{ fontSize: 11.5, color: "var(--text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {displayLabel}
+          </span>
+          {displaySubtitle && (
+            <span style={{ fontSize: 10.5, color: "var(--text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {displaySubtitle}
+            </span>
+          )}
         </span>
         <ActionStatusBadge status={block.status} />
         {block.result?.durationMs != null && block.status === "done" && (

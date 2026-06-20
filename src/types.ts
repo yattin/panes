@@ -293,6 +293,8 @@ export interface ActionBlock {
   engineActionId?: string;
   actionType: ActionType;
   summary: string;
+  displayLabel?: string;
+  displaySubtitle?: string;
   details: Record<string, unknown>;
   outputChunks: Array<{ stream: "stdout" | "stderr" | "stdin"; content: string }>;
   outputDeferred?: boolean;
@@ -1161,6 +1163,8 @@ export interface ActionStartedEvent {
   engine_action_id?: string | null;
   action_type: ActionType;
   summary: string;
+  display_label?: string | null;
+  display_subtitle?: string | null;
   details: Record<string, unknown>;
 }
 

@@ -23,14 +23,19 @@ use crate::{
 };
 
 pub mod api_direct;
+#[path = "../contexts/agent_runtime/claude_code_native/mod.rs"]
 pub mod claude_code_native;
 pub mod claude_sidecar;
+#[path = "../contexts/agent_runtime/codex/mod.rs"]
 pub mod codex;
+#[path = "../contexts/agent_runtime/codex_event_mapper/mod.rs"]
 pub mod codex_event_mapper;
 pub mod codex_protocol;
 pub mod codex_transport;
+#[path = "../contexts/agent_runtime/cuelight/tools.rs"]
 pub mod cuelight_tools;
 pub mod events;
+#[path = "../contexts/agent_runtime/opencode/mod.rs"]
 pub mod opencode;
 
 pub use codex::CodexRuntimeEvent;

@@ -205,49 +205,23 @@ impl ClaudeCodeApp {
             }
 
             match api_client.chat_stream(messages, None).await {
-                Ok(response) => {
+                Ok(mut stream) => {
                     use futures::StreamExt;
 
-                    // Handle streaming response
-                    let mut stream = response.bytes_stream();
                     let mut buffer = String::new();
 
-                    while let Some(chunk) = stream.next().await {
-                        match chunk {
-                            Ok(bytes) => {
-                                // Parse SSE stream
-                                let text = String::from_utf8_lossy(&bytes);
-                                for line in text.lines() {
-                                    if line.starts_with("data: ") {
-                                        let data = &line[6..];
-                                        if data == "[DONE]" {
-                                            tx.send(GuiMessage::StreamChunk {
-                                                content: buffer.clone(),
-                                                done: true,
-                                            })
-                                            .await
-                                            .ok();
-                                            return;
-                                        }
-
-                                        if let Ok(chunk) =
-                                            serde_json::from_str::<crate::api::StreamChunk>(data)
-                                        {
-                                            if let Some(choice) = chunk.choices.first() {
-                                                if let Some(content) = &choice.delta.content {
-                                                    buffer.push_str(content);
-                                                    tx.send(GuiMessage::StreamChunk {
-                                                        content: buffer.clone(),
-                                                        done: false,
-                                                    })
-                                                    .await
-                                                    .ok();
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                    while let Some(event) = stream.next().await {
+                        match event {
+                            Ok(crate::api::ModelStreamEvent::TextDelta(content)) => {
+                                buffer.push_str(&content);
+                                tx.send(GuiMessage::StreamChunk {
+                                    content: buffer.clone(),
+                                    done: false,
+                                })
+                                .await
+                                .ok();
                             }
+                            Ok(_) => {}
                             Err(e) => {
                                 tx.send(GuiMessage::ApiError {
                                     error: format!("Stream error: {}", e),
@@ -258,6 +232,12 @@ impl ClaudeCodeApp {
                             }
                         }
                     }
+                    tx.send(GuiMessage::StreamChunk {
+                        content: buffer,
+                        done: true,
+                    })
+                    .await
+                    .ok();
                 }
                 Err(e) => {
                     tx.send(GuiMessage::ApiError {

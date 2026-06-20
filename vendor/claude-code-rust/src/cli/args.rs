@@ -112,58 +112,15 @@ impl Cli {
     async fn run_query(&self, state: crate::state::AppState, prompt: String) -> anyhow::Result<()> {
         let client = crate::api::ApiClient::new(state.settings.clone());
 
-        let api_key = match client.get_api_key() {
-            Some(key) => key,
-            None => {
-                eprintln!("Error: API key not configured");
-                eprintln!("Set environment variable DEEPSEEK_API_KEY or run:");
-                eprintln!("  claude-code config set api_key \"your-api-key\"");
-                std::process::exit(1);
-            }
-        };
-
         let messages = vec![crate::api::ChatMessage::user(&prompt)];
-        let base_url = client.get_base_url().to_string();
-        let model = client.get_model().to_string();
-        let max_tokens = state.settings.api.max_tokens;
+        let response = client.chat(messages, None).await?;
 
-        let request_body = serde_json::json!({
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "stream": false,
-            "temperature": 0.7
-        });
-
-        let http_client = reqwest::Client::new();
-        let url = format!("{}/v1/chat/completions", base_url);
-
-        let response = http_client
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!("API error ({}): {}", status, body));
-        }
-
-        let json: serde_json::Value = response.json().await?;
-
-        if let Some(choices) = json.get("choices").and_then(|c| c.as_array()) {
-            if let Some(choice) = choices.first() {
-                if let Some(content) = choice
-                    .get("message")
-                    .and_then(|m| m.get("content"))
-                    .and_then(|c| c.as_str())
-                {
-                    println!("{}", content);
-                }
-            }
+        if let Some(content) = response
+            .choices
+            .first()
+            .and_then(|choice| choice.message.content.as_deref())
+        {
+            println!("{}", content);
         }
 
         Ok(())

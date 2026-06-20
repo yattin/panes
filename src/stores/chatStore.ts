@@ -1293,6 +1293,14 @@ function applyStreamEvent(messages: Message[], event: StreamEvent, threadId: str
       engineActionId: event.engine_action_id as string | undefined,
       actionType: String(event.action_type ?? "other") as ActionBlock["actionType"],
       summary: String(event.summary ?? ""),
+      displayLabel:
+        typeof event.display_label === "string" && event.display_label.trim()
+          ? event.display_label
+          : undefined,
+      displaySubtitle:
+        typeof event.display_subtitle === "string" && event.display_subtitle.trim()
+          ? event.display_subtitle
+          : undefined,
       details: (event.details as Record<string, unknown>) ?? {},
       outputChunks: [],
       outputDeferred: false,

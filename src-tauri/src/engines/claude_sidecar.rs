@@ -1266,6 +1266,8 @@ impl Engine for ClaudeSidecarEngine {
                                             engine_action_id: None,
                                             action_type: Self::parse_action_type(&action_type),
                                             summary,
+                                            display_label: None,
+                                            display_subtitle: None,
                                             details: details.unwrap_or(serde_json::json!({})),
                                         })
                                         .await

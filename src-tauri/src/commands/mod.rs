@@ -1,4 +1,5 @@
 pub mod app;
+#[path = "../contexts/conversation/application/chat.rs"]
 pub mod chat;
 pub mod cuelight;
 pub mod engines;
@@ -8,5 +9,6 @@ pub mod harness;
 pub mod power;
 pub mod setup;
 pub mod terminal;
+#[path = "../contexts/thread_lifecycle/application/threads.rs"]
 pub mod threads;
 pub mod workspace;

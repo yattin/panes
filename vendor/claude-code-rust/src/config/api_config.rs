@@ -2,20 +2,57 @@
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiProtocol {
+    Auto,
+    AnthropicMessages,
+    OpenAiChatCompletions,
+}
+
+fn default_protocol() -> ApiProtocol {
+    ApiProtocol::Auto
+}
+
+fn default_base_url() -> String {
+    "https://api.anthropic.com".to_string()
+}
+
+fn default_max_tokens() -> usize {
+    4096
+}
+
+fn default_timeout() -> u64 {
+    120
+}
+
+fn default_streaming() -> bool {
+    true
+}
+
 /// Anthropic API configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConfig {
     /// API key (can be set via environment variable)
+    #[serde(default)]
     pub api_key: Option<String>,
     /// Base URL for API requests
+    #[serde(default = "default_base_url")]
     pub base_url: String,
+    /// Preferred upstream protocol.
+    #[serde(default = "default_protocol")]
+    pub protocol: ApiProtocol,
     /// Maximum tokens per request
+    #[serde(default = "default_max_tokens")]
     pub max_tokens: usize,
     /// Request timeout in seconds
+    #[serde(default = "default_timeout")]
     pub timeout: u64,
     /// Enable streaming responses
+    #[serde(default = "default_streaming")]
     pub streaming: bool,
     /// Beta headers to include
+    #[serde(default)]
     pub beta_headers: Vec<String>,
 }
 
@@ -23,7 +60,8 @@ impl Default for ApiConfig {
     fn default() -> Self {
         Self {
             api_key: None,
-            base_url: "https://api.anthropic.com".to_string(),
+            base_url: default_base_url(),
+            protocol: default_protocol(),
             max_tokens: 4096,
             timeout: 120,
             streaming: true,

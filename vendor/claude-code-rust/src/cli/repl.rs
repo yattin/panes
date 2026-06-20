@@ -2,7 +2,7 @@
 //!
 //! Beautiful REPL interface matching the original Claude Code aesthetic
 
-use crate::api::{ApiClient, ChatMessage, ToolCall, ToolDefinition};
+use crate::api::{ApiClient, ChatMessage, ToolDefinition};
 use crate::cli::ui;
 use crate::mcp::ToolRegistry;
 use crate::state::AppState;
@@ -80,13 +80,12 @@ impl Repl {
 
         let client = ApiClient::new(self.state.settings.clone());
 
-        let api_key = match client.get_api_key() {
-            Some(key) => key,
-            None => {
-                ui::print_error("API key not configured\n\nSet it with:\n  claude-code config set api_key \"your-api-key\"");
-                return Ok(());
-            }
-        };
+        if client.get_api_key().is_none() {
+            ui::print_error(
+                "API key not configured\n\nSet it with:\n  claude-code config set api_key \"your-api-key\"",
+            );
+            return Ok(());
+        }
 
         self.conversation_history.push(ChatMessage::user(input));
 
@@ -99,164 +98,69 @@ impl Repl {
             ui::print_typing_indicator();
 
             let messages = self.conversation_history.clone();
-            let base_url = client.get_base_url();
-            let model = client.get_model().to_string();
-            let max_tokens = self.state.settings.api.max_tokens;
-
-            let mut request_body = serde_json::json!({
-                "model": model,
-                "messages": messages,
-                "max_tokens": max_tokens,
-                "stream": false,
-                "temperature": 0.7
-            });
-
-            // 注入工具定义
-            if !tools.is_empty() {
-                request_body["tools"] = serde_json::to_value(&tools)?;
-            }
-
-            let http_client = reqwest::blocking::Client::new();
-            let url = format!("{}/v1/chat/completions", base_url);
-
-            let resp = match http_client
-                .post(&url)
-                .header("Authorization", format!("Bearer {}", api_key))
-                .header("Content-Type", "application/json")
-                .json(&request_body)
-                .send()
-            {
-                Ok(r) => r,
+            let response = match block_on_mcp(client.chat(
+                messages,
+                if tools.is_empty() {
+                    None
+                } else {
+                    Some(tools.clone())
+                },
+            )) {
+                Ok(response) => response,
                 Err(e) => {
                     ui::print_error(&format!("Request failed: {}", e));
                     return Ok(());
                 }
             };
 
-            if !resp.status().is_success() {
-                let status = resp.status();
-                let body = resp.text().unwrap_or_default();
-                ui::print_error(&format!("API error ({}): {}", status, body));
-                return Ok(());
+            let Some(choice) = response.choices.first() else {
+                break;
+            };
+            let message = &choice.message;
+
+            if let Some(calls) = message.tool_calls.clone().filter(|calls| !calls.is_empty()) {
+                println!();
+                for call in &calls {
+                    println!(
+                        "  {} Executing tool: {}",
+                        "🔧".truecolor(255, 200, 100),
+                        call.function.name.cyan().bold()
+                    );
+                }
+                println!();
+
+                self.conversation_history.push(ChatMessage {
+                    role: "assistant".to_string(),
+                    content: message.content.clone(),
+                    tool_calls: Some(calls.clone()),
+                    tool_call_id: None,
+                });
+
+                for call in &calls {
+                    let args: serde_json::Value = serde_json::from_str(&call.function.arguments)
+                        .unwrap_or(serde_json::json!({}));
+                    let result = self.execute_tool(&call.function.name, args);
+                    self.conversation_history
+                        .push(ChatMessage::tool(&call.id, result));
+                }
+
+                continue;
             }
 
-            let json: serde_json::Value = resp.json().unwrap_or(serde_json::json!({}));
+            if let Some(content) = message.content.as_deref() {
+                ui::print_claude_message(content);
+                self.conversation_history
+                    .push(ChatMessage::assistant(content.to_string()));
 
-            if let Some(choices) = json.get("choices").and_then(|c| c.as_array()) {
-                if let Some(choice) = choices.first() {
-                    let message = choice.get("message");
-
-                    // 检查是否有工具调用
-                    let tool_calls = message
-                        .and_then(|m| m.get("tool_calls"))
-                        .and_then(|tc| tc.as_array())
-                        .cloned();
-
-                    if let Some(calls) = tool_calls {
-                        if !calls.is_empty() {
-                            // 打印工具调用信息
-                            println!();
-                            for call in &calls {
-                                if let Some(func) = call.get("function") {
-                                    let tool_name = func
-                                        .get("name")
-                                        .and_then(|n| n.as_str())
-                                        .unwrap_or("unknown");
-                                    println!(
-                                        "  {} Executing tool: {}",
-                                        "🔧".truecolor(255, 200, 100),
-                                        tool_name.cyan().bold()
-                                    );
-                                }
-                            }
-                            println!();
-
-                            // 添加 assistant 消息（带 tool_calls）
-                            let tool_calls_parsed: Vec<ToolCall> = calls
-                                .iter()
-                                .filter_map(|call| {
-                                    let id = call.get("id")?.as_str()?.to_string();
-                                    let r#type = call.get("type")?.as_str()?.to_string();
-                                    let func = call.get("function")?;
-                                    let name = func.get("name")?.as_str()?.to_string();
-                                    let arguments = func.get("arguments")?.as_str()?.to_string();
-                                    Some(ToolCall {
-                                        id,
-                                        r#type,
-                                        function: crate::api::ToolCallFunction { name, arguments },
-                                    })
-                                })
-                                .collect();
-
-                            let assistant_msg = ChatMessage {
-                                role: "assistant".to_string(),
-                                content: message
-                                    .and_then(|m| m.get("content"))
-                                    .and_then(|c| c.as_str())
-                                    .map(|s| s.to_string()),
-                                tool_calls: Some(tool_calls_parsed),
-                                tool_call_id: None,
-                            };
-                            self.conversation_history.push(assistant_msg);
-
-                            // 执行每个工具调用并添加结果
-                            for call in &calls {
-                                if let (Some(id), Some(func)) = (
-                                    call.get("id").and_then(|i| i.as_str()),
-                                    call.get("function"),
-                                ) {
-                                    let tool_name = func
-                                        .get("name")
-                                        .and_then(|n| n.as_str())
-                                        .unwrap_or("unknown");
-                                    let args_str = func
-                                        .get("arguments")
-                                        .and_then(|a| a.as_str())
-                                        .unwrap_or("{}");
-
-                                    let args: serde_json::Value = serde_json::from_str(args_str)
-                                        .unwrap_or(serde_json::json!({}));
-
-                                    // 执行工具
-                                    let result = self.execute_tool(tool_name, args);
-
-                                    // 添加工具结果消息
-                                    let tool_result_msg = ChatMessage::tool(id, result);
-                                    self.conversation_history.push(tool_result_msg);
-                                }
-                            }
-
-                            // 继续循环，让 AI 处理工具结果
-                            continue;
-                        }
-                    }
-
-                    // 没有工具调用，处理普通响应
-                    if let Some(content) = message
-                        .and_then(|m| m.get("content"))
-                        .and_then(|c| c.as_str())
-                    {
-                        ui::print_claude_message(content);
-                        self.conversation_history
-                            .push(ChatMessage::assistant(content.to_string()));
-
-                        // Print token usage if available
-                        if let Some(usage) = json.get("usage") {
-                            if let (Some(prompt), Some(completion)) = (
-                                usage.get("prompt_tokens").and_then(|t| t.as_u64()),
-                                usage.get("completion_tokens").and_then(|t| t.as_u64()),
-                            ) {
-                                let total = prompt + completion;
-                                println!(
-                                    "  {} {} prompt · {} generated · {} total",
-                                    "◦".truecolor(100, 100, 100),
-                                    prompt.to_string().truecolor(150, 150, 150),
-                                    completion.to_string().truecolor(150, 150, 150),
-                                    total.to_string().truecolor(180, 180, 180)
-                                );
-                            }
-                        }
-                    }
+                if let Some(usage) = response.usage.as_ref() {
+                    let total = usage.prompt_tokens + usage.completion_tokens;
+                    println!(
+                        "  {} {} prompt · {} generated · {} total",
+                        "◦".truecolor(100, 100, 100),
+                        usage.prompt_tokens.to_string().truecolor(150, 150, 150),
+                        usage.completion_tokens.to_string().truecolor(150, 150, 150),
+                        total.to_string().truecolor(180, 180, 180)
+                    );
                 }
             }
 

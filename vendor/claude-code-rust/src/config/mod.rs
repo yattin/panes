@@ -3,7 +3,7 @@
 pub mod api_config;
 pub mod mcp_config;
 
-pub use api_config::ApiConfig;
+pub use api_config::{ApiConfig, ApiProtocol};
 pub use mcp_config::{McpConfig, McpServerStatus};
 
 use serde::{Deserialize, Serialize};
@@ -132,6 +132,14 @@ impl Settings {
             "verbose" => settings.verbose = value.parse().unwrap_or(false),
             "api_key" => settings.api.api_key = Some(value.to_string()),
             "base_url" => settings.api.base_url = value.to_string(),
+            "protocol" => {
+                settings.api.protocol = match value {
+                    "auto" => api_config::ApiProtocol::Auto,
+                    "anthropic_messages" => api_config::ApiProtocol::AnthropicMessages,
+                    "openai_chat_completions" => api_config::ApiProtocol::OpenAiChatCompletions,
+                    _ => return Err(anyhow::anyhow!("Unknown API protocol: {}", value)),
+                }
+            }
             "max_tokens" => settings.api.max_tokens = value.parse().unwrap_or(4096),
             "timeout" => settings.api.timeout = value.parse().unwrap_or(120),
             "streaming" => settings.api.streaming = value.parse().unwrap_or(true),
