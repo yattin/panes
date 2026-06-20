@@ -1,14 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   buildStaticReleasePlatforms,
   resolveUpdaterAssetPairs,
 } from "../scripts/lib/update-manifest.mjs";
-import {
-  generateUpdateManifest,
-  main as generateUpdateManifestMain,
-  resolveReleaseTag,
-} from "../scripts/generate-update-manifest.mjs";
+type GenerateUpdateManifestModule = typeof import("../scripts/generate-update-manifest.mjs");
+
+let generateUpdateManifest: GenerateUpdateManifestModule["generateUpdateManifest"];
+let generateUpdateManifestMain: GenerateUpdateManifestModule["main"];
+let resolveReleaseTag: GenerateUpdateManifestModule["resolveReleaseTag"];
+
+beforeAll(async () => {
+  ({
+    generateUpdateManifest,
+    main: generateUpdateManifestMain,
+    resolveReleaseTag,
+  } = await import("../scripts/generate-update-manifest.mjs"));
+});
 
 describe("resolveUpdaterAssetPairs", () => {
   it("maps one universal macOS updater asset to both darwin targets", () => {

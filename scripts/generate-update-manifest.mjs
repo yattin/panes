@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Generates latest.json for the Tauri updater from GitHub Release assets.
  *
@@ -108,15 +107,16 @@ const isCliEntrypoint =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isCliEntrypoint) {
-  try {
-    const manifest = await main();
-    console.log(
-      `Generated latest.json for ${manifest.version} with platforms: ${Object.keys(
-        manifest.platforms,
-      ).join(", ")}`,
-    );
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
+  main()
+    .then((manifest) => {
+      console.log(
+        `Generated latest.json for ${manifest.version} with platforms: ${Object.keys(
+          manifest.platforms,
+        ).join(", ")}`,
+      );
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
 }
