@@ -69,7 +69,8 @@ interface WorkspacePaneState {
 
 const STORAGE_KEY = (workspaceId: string) => `panes:workspacePaneLayout:${workspaceId}`;
 const DEFAULT_SPLIT_RATIO = 0.66;
-const SURFACE_ORDER: WorkspacePaneSurfaceKind[] = ["chat", "overview", "storyboard", "assets"];
+// 仅保留 chat，CueLight 面板已移到右侧侧栏
+const SURFACE_ORDER: WorkspacePaneSurfaceKind[] = ["chat"];
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

@@ -5,14 +5,11 @@ import { Sidebar } from "../sidebar/Sidebar";
 import { ActiveWorkspacePaneShell } from "../workspace/WorkspacePaneShell";
 import { HarnessPanel } from "../onboarding/HarnessPanel";
 import { WorkspaceSettingsPage } from "../workspace/WorkspaceSettingsPage";
-import { GitPanel } from "../git/GitPanel";
+import { CueLightPanel } from "../cuelight/CueLightPanel";
 import { usesCustomWindowFrame } from "../../lib/windowActions";
 import { useUiStore } from "../../stores/uiStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
-import {
-  GitFlyoutContext,
-  isTargetWithinGitFlyoutRegion,
-} from "../../lib/gitFlyoutRegion";
 
 const SIDEBAR_WIDTH_KEY = "panes:sidebar-width";
 const GIT_PANEL_SIZE_KEY = "panes:git-panel-size";
@@ -53,41 +50,30 @@ function loadGitPanelSize(): number {
 }
 
 export function ThreeColumnLayout() {
-  const { t } = useTranslation("git");
   const showSidebar = useUiStore((state) => state.showSidebar);
   const sidebarPinned = useUiStore((state) => state.sidebarPinned);
   const toggleSidebarPin = useUiStore((state) => state.toggleSidebarPin);
-  const showGitPanel = useUiStore((state) => state.showGitPanel);
-  const gitPanelPinned = useUiStore((state) => state.gitPanelPinned);
-  const setGitPanelPinned = useUiStore((state) => state.setGitPanelPinned);
   const focusMode = useUiStore((state) => state.focusMode);
   const activeView = useUiStore((state) => state.activeView);
   const customWindowFrame = usesCustomWindowFrame();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
   const sidebarDocked = showSidebar && sidebarPinned;
-  const gitPanelDocked = showGitPanel && gitPanelPinned;
   const fullBleedContent = focusMode || !showSidebar;
-  const showFocusDragStrip = focusMode && !showSidebar && !gitPanelDocked && !customWindowFrame;
+  const showCueLightPanel = activeWorkspaceId !== null;
 
   const [sidebarWidth, setSidebarWidth] = useState(loadSidebarWidth);
-  const [gitPanelSize, setGitPanelSize] = useState(loadGitPanelSize);
-  const [contentCardWidth, setContentCardWidth] = useState(0);
-  const [gitFlyoutVisible, setGitFlyoutVisible] = useState(false);
+  const [cuelightPanelSize, setCuelightPanelSize] = useState(loadGitPanelSize);
   const sidebarHandleRef = useRef<HTMLDivElement>(null);
   const contentCardRef = useRef<HTMLDivElement>(null);
-  const gitFlyoutRef = useRef<HTMLDivElement>(null);
-  const gitTriggerRef = useRef<HTMLButtonElement>(null);
-  const gitFlyoutCloseTimerRef = useRef<number | null>(null);
-  const gitFlyoutInternalPointerDownRef = useRef(false);
-  const gitFlyoutInternalPointerResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); } catch { /* ignore */ }
   }, [sidebarWidth]);
 
   useEffect(() => {
-    try { localStorage.setItem(GIT_PANEL_SIZE_KEY, String(gitPanelSize)); } catch { /* ignore */ }
-  }, [gitPanelSize]);
+    try { localStorage.setItem(GIT_PANEL_SIZE_KEY, String(cuelightPanelSize)); } catch { /* ignore */ }
+  }, [cuelightPanelSize]);
 
   useEffect(() => {
     const contentCard = contentCardRef.current;
@@ -96,7 +82,7 @@ export function ThreeColumnLayout() {
     }
 
     const updateWidth = () => {
-      setContentCardWidth(contentCard.getBoundingClientRect().width);
+      // Keep contentCardWidth state for potential future use
     };
 
     updateWidth();
@@ -104,52 +90,6 @@ export function ThreeColumnLayout() {
     observer.observe(contentCard);
     return () => observer.disconnect();
   }, []);
-
-  const clearGitFlyoutCloseTimer = useCallback(() => {
-    if (gitFlyoutCloseTimerRef.current !== null) {
-      window.clearTimeout(gitFlyoutCloseTimerRef.current);
-      gitFlyoutCloseTimerRef.current = null;
-    }
-  }, []);
-
-  const clearGitFlyoutInternalPointerResetTimer = useCallback(() => {
-    if (gitFlyoutInternalPointerResetTimerRef.current !== null) {
-      window.clearTimeout(gitFlyoutInternalPointerResetTimerRef.current);
-      gitFlyoutInternalPointerResetTimerRef.current = null;
-    }
-  }, []);
-
-  const openGitFlyout = useCallback(() => {
-    if (!showGitPanel || gitPanelPinned) {
-      return;
-    }
-    clearGitFlyoutCloseTimer();
-    setGitFlyoutVisible(true);
-  }, [clearGitFlyoutCloseTimer, gitPanelPinned, showGitPanel]);
-
-  const closeGitFlyout = useCallback((delay = 0) => {
-    clearGitFlyoutCloseTimer();
-    if (delay <= 0) {
-      setGitFlyoutVisible(false);
-      return;
-    }
-    gitFlyoutCloseTimerRef.current = window.setTimeout(() => {
-      gitFlyoutCloseTimerRef.current = null;
-      setGitFlyoutVisible(false);
-    }, delay);
-  }, [clearGitFlyoutCloseTimer]);
-
-  useEffect(() => {
-    if (!showGitPanel || gitPanelPinned) {
-      setGitFlyoutVisible(false);
-      clearGitFlyoutCloseTimer();
-    }
-  }, [clearGitFlyoutCloseTimer, gitPanelPinned, showGitPanel]);
-
-  useEffect(() => () => {
-    clearGitFlyoutCloseTimer();
-    clearGitFlyoutInternalPointerResetTimer();
-  }, [clearGitFlyoutCloseTimer, clearGitFlyoutInternalPointerResetTimer]);
 
   const handleSidebarResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -179,56 +119,6 @@ export function ThreeColumnLayout() {
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   }, [sidebarWidth, toggleSidebarPin]);
-
-  const handleGitTriggerBlur = useCallback((event: React.FocusEvent<HTMLButtonElement>) => {
-    if (gitFlyoutInternalPointerDownRef.current) {
-      return;
-    }
-    const nextTarget = event.relatedTarget;
-    if (isTargetWithinGitFlyoutRegion(nextTarget, [gitFlyoutRef.current, gitTriggerRef.current])) {
-      return;
-    }
-    closeGitFlyout();
-  }, [closeGitFlyout]);
-
-  const handleGitFlyoutBlurCapture = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    if (gitFlyoutInternalPointerDownRef.current) {
-      return;
-    }
-    const nextTarget = event.relatedTarget;
-    if (isTargetWithinGitFlyoutRegion(nextTarget, [gitFlyoutRef.current, gitTriggerRef.current])) {
-      return;
-    }
-    closeGitFlyout();
-  }, [closeGitFlyout]);
-
-  const handleGitFlyoutPointerDownCapture = useCallback(() => {
-    gitFlyoutInternalPointerDownRef.current = true;
-    clearGitFlyoutInternalPointerResetTimer();
-    openGitFlyout();
-    gitFlyoutInternalPointerResetTimerRef.current = window.setTimeout(() => {
-      gitFlyoutInternalPointerResetTimerRef.current = null;
-      gitFlyoutInternalPointerDownRef.current = false;
-    }, 0);
-  }, [clearGitFlyoutInternalPointerResetTimer, openGitFlyout]);
-
-  const gitFlyoutContextValue = useMemo(
-    () => ({
-      openFlyout: openGitFlyout,
-      scheduleClose: closeGitFlyout,
-      isTargetWithinRegion: (target: EventTarget | null) =>
-        isTargetWithinGitFlyoutRegion(target, [gitFlyoutRef.current, gitTriggerRef.current]),
-    }),
-    [closeGitFlyout, openGitFlyout],
-  );
-
-  const floatingGitWidth = Math.min(
-    MAX_GIT_FLYOUT_WIDTH,
-    Math.max(
-      MIN_GIT_FLYOUT_WIDTH,
-      Math.round(((contentCardWidth || 1200) * gitPanelSize) / 100),
-    ),
-  );
 
   const mainContent = (
     activeView === "harnesses" ? (
@@ -266,15 +156,7 @@ export function ThreeColumnLayout() {
         ref={contentCardRef}
         className={`content-card ${fullBleedContent ? "content-card-full" : ""}`}
       >
-        {showFocusDragStrip && (
-          <div
-            className="focus-drag-strip"
-            onMouseDown={handleDragMouseDown}
-            onDoubleClick={handleDragDoubleClick}
-          />
-        )}
-
-        {gitPanelDocked ? (
+        {showCueLightPanel && activeWorkspaceId ? (
           <PanelGroup
             key="main-layout-docked"
             id="main-layout-panels"
@@ -285,7 +167,7 @@ export function ThreeColumnLayout() {
             <Panel
               id="main-layout-content"
               order={1}
-              defaultSize={100 - gitPanelSize}
+              defaultSize={100 - cuelightPanelSize}
               minSize={35}
             >
               <div className="content-panel" style={{ height: "100%" }}>
@@ -294,23 +176,20 @@ export function ThreeColumnLayout() {
             </Panel>
 
             <PanelResizeHandle
-              id="main-layout-git-resize-handle"
+              id="main-layout-cuelight-resize-handle"
               className="resize-handle"
-              aria-label={t("panel.unpin")}
-              title={t("panel.unpin")}
-              onClick={() => setGitPanelPinned(false)}
             />
 
             <Panel
-              id="main-layout-git-panel"
+              id="main-layout-cuelight-panel"
               order={2}
-              defaultSize={gitPanelSize}
+              defaultSize={cuelightPanelSize}
               minSize={MIN_GIT_PANEL_SIZE}
               maxSize={MAX_GIT_PANEL_SIZE}
-              onResize={setGitPanelSize}
+              onResize={setCuelightPanelSize}
             >
               <div className="content-panel" style={{ height: "100%" }}>
-                <GitPanel />
+                <CueLightPanel workspaceId={activeWorkspaceId} />
               </div>
             </Panel>
           </PanelGroup>
@@ -319,61 +198,6 @@ export function ThreeColumnLayout() {
             {mainContent}
           </div>
         )}
-
-        {showGitPanel && !gitPanelPinned ? (
-          <GitFlyoutContext.Provider value={gitFlyoutContextValue}>
-            <button
-              ref={gitTriggerRef}
-              type="button"
-              className={`git-flyout-trigger${gitFlyoutVisible ? " git-flyout-trigger-active" : ""}`}
-              title={t("panel.reveal")}
-              aria-label={t("panel.reveal")}
-              onMouseEnter={openGitFlyout}
-              onMouseLeave={() => closeGitFlyout(200)}
-              onFocus={openGitFlyout}
-              onBlur={handleGitTriggerBlur}
-            />
-
-            <div
-              ref={gitFlyoutRef}
-              className="git-flyout-wrapper"
-              style={{
-                width: floatingGitWidth,
-                maxWidth: "calc(100% - 12px)",
-                pointerEvents: gitFlyoutVisible ? "auto" : "none",
-              }}
-              onMouseEnter={openGitFlyout}
-              onMouseLeave={() => closeGitFlyout(150)}
-              onPointerDownCapture={handleGitFlyoutPointerDownCapture}
-              onFocusCapture={openGitFlyout}
-              onBlurCapture={handleGitFlyoutBlurCapture}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.stopPropagation();
-                  closeGitFlyout();
-                  gitTriggerRef.current?.focus();
-                }
-              }}
-            >
-              <div
-                className={`shell-flyout shell-flyout-right ${gitFlyoutVisible ? "shell-flyout-visible" : ""}`}
-                style={{
-                  width: floatingGitWidth,
-                  maxWidth: "calc(100% - 12px)",
-                }}
-              >
-                <GitPanel
-                  mode="flyout"
-                  visible={gitFlyoutVisible}
-                  onPin={() => {
-                    setGitPanelPinned(true);
-                    setGitFlyoutVisible(false);
-                  }}
-                />
-              </div>
-            </div>
-          </GitFlyoutContext.Provider>
-        ) : null}
       </div>
     </div>
   );

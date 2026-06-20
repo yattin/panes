@@ -294,6 +294,74 @@ function splitLinesWithEndings(markdown: string): string[] {
   return markdown.match(/[^\n]*\n|[^\n]+/g) ?? [];
 }
 
+/**
+ * 预处理 markdown 内容，修复常见的表格格式问题：
+ * - 确保表格行之间有正确的换行符
+ * - 自动插入缺少的分隔行（|---|---|）
+ */
+function normalizeTableSyntax(markdown: string): string {
+  // 修复表格行之间缺少换行的问题
+  let result = markdown.replace(
+    /(\|[^|\n]+\|)(?=(\|[^|\n]+\|))/g,
+    (match, row) => row + "\n",
+  );
+
+  // 自动插入缺少的表格分隔行
+  // 检测连续多行以 | 开头和结尾的表格行，如果第二行不是分隔行则插入
+  const lines = result.split("\n");
+  const output: string[] = [];
+  let i = 0;
+  let inTable = false;
+  let hasSeparator = false;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const nextLine = lines[i + 1];
+
+    // 检测当前行是否是表格行（以 | 开头和结尾）
+    const isTableRow = /^\s*\|.+\|\s*$/.test(line);
+    const isSeparatorRow = /^\s*\|[\s\-:|]+\|\s*$/.test(line);
+
+    if (isTableRow) {
+      if (!inTable) {
+        // 进入表格
+        inTable = true;
+        hasSeparator = false;
+        output.push(line);
+
+        // 检查下一行是否是分隔行
+        if (nextLine) {
+          const nextIsSeparator = /^\s*\|[\s\-:|]+\|\s*$/.test(nextLine);
+          const nextIsTableRow = /^\s*\|.+\|\s*$/.test(nextLine);
+
+          // 如果下一行是表格行但不是分隔行，插入分隔行
+          if (nextIsTableRow && !nextIsSeparator) {
+            const columns = line.split("|").filter((c) => c.trim() !== "");
+            const separator = "| " + columns.map(() => "---").join(" | ") + " |";
+            output.push(separator);
+            hasSeparator = true;
+          }
+        }
+      } else {
+        // 已在表格中
+        if (isSeparatorRow) {
+          hasSeparator = true;
+        }
+        output.push(line);
+      }
+    } else {
+      // 非表格行，重置状态
+      inTable = false;
+      hasSeparator = false;
+      output.push(line);
+    }
+
+    i++;
+  }
+
+  return output.join("\n");
+}
+
 function tokenizeFences(markdown: string): { source: string; fences: FenceToken[] } {
   const lines = splitLinesWithEndings(markdown);
   const fences: FenceToken[] = [];
@@ -348,7 +416,9 @@ function tokenizeFences(markdown: string): { source: string; fences: FenceToken[
 }
 
 export function renderMarkdownToHtml(markdown: string): string {
-  const { source, fences } = tokenizeFences(markdown);
+  // 预处理：修复常见的表格格式问题
+  const normalized = normalizeTableSyntax(markdown);
+  const { source, fences } = tokenizeFences(normalized);
   const html = micromark(source, {
     extensions: [gfm()],
     htmlExtensions: [gfmHtml()],

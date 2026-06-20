@@ -31,20 +31,18 @@ struct HarnessDef {
     native: bool,
 }
 
-const NATIVE_HARNESSES: &[HarnessDef] = &[
-    HarnessDef {
-        id: "codex",
-        name: "Codex CLI",
-        description: "Natively integrated — powers the Panes chat engine",
-        command: "codex",
-        version_flag: "--version",
-        install_command: Some("npm"),
-        install_args: &["install", "-g", "@openai/codex"],
-        install_script: None,
-        website: "https://github.com/openai/codex",
-        native: true,
-    },
-];
+const NATIVE_HARNESSES: &[HarnessDef] = &[HarnessDef {
+    id: "codex",
+    name: "Codex CLI",
+    description: "Natively integrated — powers the Panes chat engine",
+    command: "codex",
+    version_flag: "--version",
+    install_command: Some("npm"),
+    install_args: &["install", "-g", "@openai/codex"],
+    install_script: None,
+    website: "https://github.com/openai/codex",
+    native: true,
+}];
 
 #[cfg(feature = "non-native-harnesses")]
 const NON_NATIVE_HARNESSES: &[HarnessDef] = &[

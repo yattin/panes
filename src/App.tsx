@@ -137,15 +137,6 @@ export function App() {
   const checkForUpdate = useUpdateStore((s) => s.checkForUpdate);
   const customWindowFrame = usesCustomWindowFrame();
   const customWindowFrameState = useCustomWindowFrameState();
-  const loading = useWorkspaceStore((s) => s.loading);
-
-  // 无工作区时自动弹出创建对话框
-  const [autoCreateDialogOpen, setAutoCreateDialogOpen] = useState(false);
-  useEffect(() => {
-    if (!loading && workspaces.length === 0) {
-      setAutoCreateDialogOpen(true);
-    }
-  }, [loading, workspaces.length]);
 
   useEffect(() => {
     void loadWorkspaces();
@@ -568,13 +559,13 @@ export function App() {
   }, []);
 
   return (
-    <CueLightTokenGate>
-      <div
-        className={`app-shell${customWindowFrame ? " app-shell-custom-frame" : ""}${
-          customWindowFrameState.isMaximized ? " app-shell-custom-frame-maximized" : ""
-        }${customWindowFrameState.isFullscreen ? " app-shell-custom-frame-fullscreen" : ""}`}
-      >
-        {customWindowFrame && <CustomWindowFrame frameState={customWindowFrameState} />}
+    <div
+      className={`app-shell${customWindowFrame ? " app-shell-custom-frame" : ""}${
+        customWindowFrameState.isMaximized ? " app-shell-custom-frame-maximized" : ""
+      }${customWindowFrameState.isFullscreen ? " app-shell-custom-frame-fullscreen" : ""}`}
+    >
+      {customWindowFrame && <CustomWindowFrame frameState={customWindowFrameState} />}
+      <CueLightTokenGate>
         <div className="app-shell-body">
           <ThreeColumnLayout />
         </div>
@@ -582,10 +573,7 @@ export function App() {
         <PowerSettingsModal />
         <TerminalNotificationSettingsModal />
         <ToastContainer />
-        {autoCreateDialogOpen && (
-          <CreateWorkspaceDialog onClose={() => setAutoCreateDialogOpen(false)} />
-        )}
-      </div>
-    </CueLightTokenGate>
+      </CueLightTokenGate>
+    </div>
   );
 }

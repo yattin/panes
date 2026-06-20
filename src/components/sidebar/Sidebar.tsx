@@ -325,6 +325,10 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
   }
 
   function getWorkspaceLabel(workspace: Workspace) {
+    // 优先显示 CueLight 项目名
+    if (workspace.cueLightBinding?.projectName) {
+      return workspace.cueLightBinding.projectName;
+    }
     return workspace.name || workspace.rootPath.split("/").pop() || t("app:sidebar.workspaceFallback");
   }
 
@@ -491,14 +495,25 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
             return (
               <div key={project.workspace.id} style={{ marginBottom: 2 }}>
                 {/* Workspace header */}
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   className={`sb-project ${isActiveProject ? "sb-project-active" : ""}`}
                   onClick={() => {
                     if (isActiveProject) {
                       toggleCollapse(project.workspace.id);
                     } else {
                       void onSelectProject(project.workspace.id);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (isActiveProject) {
+                        toggleCollapse(project.workspace.id);
+                      } else {
+                        void onSelectProject(project.workspace.id);
+                      }
                     }
                   }}
                 >
@@ -541,7 +556,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
                       onArchive={() => onDeleteWorkspace(project.workspace)}
                     />
                   </span>
-                </button>
+                </div>
 
                 {/* Threads — tree-line indented */}
                 {!isCollapsed && (

@@ -476,6 +476,7 @@ export function WorkspacePaneShell({ workspaceId }: WorkspacePaneShellProps) {
         </div>
 
         <div className="workspace-pane-header-actions no-drag">
+          {/* 仅 chat tab，CueLight 面板已移到右侧侧栏 */}
           <div
             className="layout-mode-switcher"
             role="tablist"

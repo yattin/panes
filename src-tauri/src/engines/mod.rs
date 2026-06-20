@@ -10,8 +10,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     engines::{
-        claude_sidecar::ClaudeSidecarEngine,
         claude_code_native::ClaudeCodeNativeEngine,
+        claude_sidecar::ClaudeSidecarEngine,
         codex::{CodexEngine, CodexForkedThread, CodexReviewStarted},
         opencode::OpenCodeEngine,
     },
@@ -23,8 +23,8 @@ use crate::{
 };
 
 pub mod api_direct;
-pub mod claude_sidecar;
 pub mod claude_code_native;
+pub mod claude_sidecar;
 pub mod codex;
 pub mod codex_event_mapper;
 pub mod codex_protocol;
@@ -920,10 +920,38 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.archive_thread(engine_thread_id).await,
             "claude" => self.claude.archive_thread(engine_thread_id).await,
-            "claude-code-native" => self.claude_code_native.archive_thread(engine_thread_id).await,
+            "claude-code-native" => {
+                self.claude_code_native
+                    .archive_thread(engine_thread_id)
+                    .await
+            }
             "opencode" => self.opencode.archive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
+    }
+
+    /// 手动压缩 claude-code-native 线程的历史记录
+    /// 返回压缩前后的 token 数
+    pub async fn compact_native_thread(
+        &self,
+        engine_thread_id: &str,
+    ) -> anyhow::Result<(usize, usize)> {
+        self.claude_code_native
+            .compact_thread(engine_thread_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to compact thread: {}", e))
+    }
+
+    /// 获取 claude-code-native 线程的当前历史 token 数
+    pub async fn get_native_history_tokens(&self, engine_thread_id: &str) -> usize {
+        self.claude_code_native
+            .get_history_tokens(engine_thread_id)
+            .await
+    }
+
+    /// 获取上下文最大限制（token 数）
+    pub fn get_context_max_tokens() -> usize {
+        claude_code_native::ClaudeCodeNativeEngine::get_context_max_tokens()
     }
 
     pub async fn unarchive_thread(&self, thread: &ThreadDto) -> anyhow::Result<()> {
@@ -934,7 +962,11 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.unarchive_thread(engine_thread_id).await,
             "claude" => self.claude.unarchive_thread(engine_thread_id).await,
-            "claude-code-native" => self.claude_code_native.unarchive_thread(engine_thread_id).await,
+            "claude-code-native" => {
+                self.claude_code_native
+                    .unarchive_thread(engine_thread_id)
+                    .await
+            }
             "opencode" => self.opencode.unarchive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }

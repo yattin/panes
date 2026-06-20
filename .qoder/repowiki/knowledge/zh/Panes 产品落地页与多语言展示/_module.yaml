@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: landing_page
+title: Panes 产品落地页与多语言展示
+scope:
+    - landing-page/
+source_files: []
+depends_on: []
+related_to: []

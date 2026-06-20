@@ -159,3 +159,35 @@ fn truncate_output(value: &str, max_chars: usize) -> String {
 fn err_to_string(error: impl std::fmt::Display) -> String {
     format!("{error:#}")
 }
+
+/// 手动压缩 claude-code-native 线程的历史记录
+/// 返回 (压缩前 token 数, 压缩后 token 数)
+#[tauri::command]
+pub async fn compact_native_thread(
+    state: State<'_, AppState>,
+    engine_thread_id: String,
+) -> Result<(usize, usize), String> {
+    state
+        .engines
+        .compact_native_thread(&engine_thread_id)
+        .await
+        .map_err(err_to_string)
+}
+
+/// 获取 claude-code-native 线程的当前历史 token 数
+#[tauri::command]
+pub async fn get_native_history_tokens(
+    state: State<'_, AppState>,
+    engine_thread_id: String,
+) -> Result<usize, String> {
+    Ok(state
+        .engines
+        .get_native_history_tokens(&engine_thread_id)
+        .await)
+}
+
+/// 获取上下文最大限制（token 数）
+#[tauri::command]
+pub fn get_context_max_tokens() -> usize {
+    crate::engines::EngineManager::get_context_max_tokens()
+}

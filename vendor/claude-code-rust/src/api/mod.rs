@@ -45,6 +45,7 @@ impl ApiClient {
             .get_api_key()
             .ok_or_else(|| anyhow::anyhow!("API key not configured"))?;
 
+        let parallel_tool_calls = tools.as_ref().map(|_| false);
         let request = ChatRequest {
             model: self.settings.api.get_model_id(&self.settings.model),
             messages,
@@ -52,6 +53,7 @@ impl ApiClient {
             stream: false,
             temperature: 0.7,
             tools,
+            parallel_tool_calls,
         };
 
         let url = format!("{}/v1/chat/completions", self.get_base_url());
@@ -84,6 +86,7 @@ impl ApiClient {
             .get_api_key()
             .ok_or_else(|| anyhow::anyhow!("API key not configured"))?;
 
+        let parallel_tool_calls = tools.as_ref().map(|_| false);
         let request = ChatRequest {
             model: self.settings.api.get_model_id(&self.settings.model),
             messages,
@@ -91,6 +94,7 @@ impl ApiClient {
             stream: true,
             temperature: 0.7,
             tools,
+            parallel_tool_calls,
         };
 
         let url = format!("{}/v1/chat/completions", self.get_base_url());
@@ -217,6 +221,8 @@ struct ChatRequest {
     temperature: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     tools: Option<Vec<ToolDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parallel_tool_calls: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

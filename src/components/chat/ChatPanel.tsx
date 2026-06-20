@@ -42,6 +42,8 @@ import {
   Eye,
   Compass,
   BookOpen,
+  Archive,
+  Gauge,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -1553,6 +1555,16 @@ function usagePercentToWidth(percent: number | null): string {
   return `${Math.max(0, Math.min(100, Math.round(percent)))}%`;
 }
 
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}k`;
+  }
+  return String(tokens);
+}
+
 interface ChatPanelProps {
   embedded?: boolean;
 }
@@ -1597,6 +1609,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   const [selectedServiceTier, setSelectedServiceTier] = useState<CodexServiceTierValue>("inherit");
   const [outputSchemaText, setOutputSchemaText] = useState("");
   const [customApprovalPolicyText, setCustomApprovalPolicyText] = useState("");
+  const [nativeContextTokens, setNativeContextTokens] = useState<number>(0);
+  const [nativeContextMaxTokens, setNativeContextMaxTokens] = useState<number>(1_000_000);
+  const [isCompacting, setIsCompacting] = useState(false);
   const [editingThreadTitle, setEditingThreadTitle] = useState(false);
   const [threadTitleDraft, setThreadTitleDraft] = useState("");
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(
@@ -3094,6 +3109,76 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     prependLoadInFlightRef.current = false;
   }, [threadId]);
 
+  // 获取 claude-code-native 的上下文 token 数
+  useEffect(() => {
+    if (selectedEngineId !== "claude-code-native" || !activeThread?.engineThreadId) {
+      setNativeContextTokens(0);
+      return;
+    }
+
+    const fetchTokens = async () => {
+      try {
+        const tokens = await ipc.getNativeHistoryTokens(activeThread.engineThreadId!);
+        const maxTokens = await ipc.getContextMaxTokens();
+        setNativeContextTokens(tokens);
+        setNativeContextMaxTokens(maxTokens);
+      } catch (err) {
+        console.error("Failed to fetch context tokens:", err);
+      }
+    };
+
+    void fetchTokens();
+    // 每次消息完成后刷新 token 数
+    const interval = setInterval(() => {
+      if (!streaming) {
+        void fetchTokens();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [selectedEngineId, activeThread?.engineThreadId, streaming, messages.length]);
+
+  // 手动压缩上下文
+  const handleCompactContext = useCallback(async () => {
+    if (!activeThread?.engineThreadId || isCompacting) return;
+    
+    setIsCompacting(true);
+    try {
+      const [before, after] = await ipc.compactNativeThread(activeThread.engineThreadId);
+      setNativeContextTokens(after);
+      toast.success(
+        t("panel.contextCompacted", {
+          defaultValue: `上下文已压缩：${formatTokenCount(before)} → ${formatTokenCount(after)}`,
+        })
+      );
+    } catch (err) {
+      toast.error(
+        t("panel.contextCompactFailed", {
+          defaultValue: `压缩失败：${err instanceof Error ? err.message : String(err)}`,
+        })
+      );
+    } finally {
+      setIsCompacting(false);
+    }
+  }, [activeThread?.engineThreadId, isCompacting, t]);
+
+  // 自动压缩：当上下文超过 60% 时自动触发压缩
+  useEffect(() => {
+    const AUTO_COMPACT_THRESHOLD = 0.6; // 60%
+    const contextPercent = nativeContextTokens / nativeContextMaxTokens;
+    
+    if (
+      selectedEngineId === "claude-code-native" &&
+      activeThread?.engineThreadId &&
+      contextPercent >= AUTO_COMPACT_THRESHOLD &&
+      !isCompacting &&
+      !streaming
+    ) {
+      // 自动触发压缩
+      void handleCompactContext();
+    }
+  }, [nativeContextTokens, nativeContextMaxTokens, selectedEngineId, activeThread?.engineThreadId, isCompacting, streaming, handleCompactContext]);
+
   useEffect(() => {
     if (!threadId) {
       initialScrollThreadRef.current = null;
@@ -3901,26 +3986,25 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     const submitPlanMode = submitEngineId === "opencode" ? false : planMode;
 
     const activeScopeRepoId = activeRepo?.id ?? null;
-    const activeThreadInScope = activeThread
-      ? activeThread.workspaceId === activeWorkspaceId &&
-        activeThread.repoId === activeScopeRepoId
-      : false;
-    const activeThreadModelMatch = activeThread
-      ? submitEngineId === "codex" ||
-        activeThread.modelId === submitModelId ||
-        readThreadLastModelId(activeThread) === submitModelId
-      : false;
-    const activeThreadEngineMatch = activeThread
-      ? activeThread.engineId === submitEngineId
-      : false;
 
-    let targetThreadId =
-      threadId &&
-      activeThreadInScope &&
-      activeThreadEngineMatch &&
-      activeThreadModelMatch
-        ? threadId
-        : null;
+    // 优先使用 chatStore 的 threadId，如果存在则尝试复用
+    let targetThreadId = threadId ?? null;
+
+    // 如果有 activeThread，验证是否匹配当前作用域/引擎/模型
+    if (targetThreadId && activeThread) {
+      const scopeMatch =
+        activeThread.workspaceId === activeWorkspaceId &&
+        activeThread.repoId === activeScopeRepoId;
+      const engineMatch = activeThread.engineId === submitEngineId;
+      const modelMatch =
+        submitEngineId === "codex" ||
+        activeThread.modelId === submitModelId ||
+        readThreadLastModelId(activeThread) === submitModelId;
+
+      if (!scopeMatch || !engineMatch || !modelMatch) {
+        targetThreadId = null;
+      }
+    }
 
     if (!targetThreadId) {
       const createdThreadId = await createThread({
@@ -3944,6 +4028,8 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       manualThreadBindTargetRef.current = createdThreadId;
       try {
         await bindChatThread(createdThreadId);
+        // 同步更新 threadStore 的 activeThreadId，确保下次发送消息时能复用此线程
+        setActiveThreadInStore(createdThreadId);
       } finally {
         if (manualThreadBindTargetRef.current === createdThreadId) {
           manualThreadBindTargetRef.current = null;
@@ -5895,6 +5981,36 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
               )}
 
               <div style={{ flex: 1 }} />
+
+              {/* Claude Code Native 上下文管理 - 图标 + 浮层 */}
+              {selectedEngineId === "claude-code-native" && activeThread && messages.length > 0 && (
+                <div className="chat-context-icon-wrapper">
+                  <div className="chat-context-icon">
+                    <Gauge size={14} />
+                    <span className="chat-context-icon-percent">
+                      {Math.round((nativeContextTokens / nativeContextMaxTokens) * 100)}%
+                    </span>
+                  </div>
+                  <div className="chat-context-popover">
+                    <div className="chat-context-popover-text">
+                      {Math.round((nativeContextTokens / nativeContextMaxTokens) * 100)}%
+                      {" "}
+                      {formatTokenCount(nativeContextTokens)} / {formatTokenCount(nativeContextMaxTokens)}
+                      {" "}
+                      <span className="chat-context-popover-label">已用上下文</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="chat-context-popover-btn"
+                      onClick={() => void handleCompactContext()}
+                      disabled={isCompacting || nativeContextTokens < 10000}
+                    >
+                      <Archive size={11} className={isCompacting ? "spinning" : ""} />
+                      {isCompacting ? "压缩中..." : "压缩当前会话"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {streaming && !showSpecialInputComposer && (

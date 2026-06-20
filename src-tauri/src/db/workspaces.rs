@@ -4,8 +4,8 @@ use anyhow::Context;
 use rusqlite::{params, OptionalExtension};
 use uuid::Uuid;
 
-use crate::models::WorkspaceDto;
 use crate::models::CueLightBindingDto;
+use crate::models::WorkspaceDto;
 use crate::path_utils;
 use crate::runtime_env;
 
@@ -440,8 +440,7 @@ pub fn set_cuelight_binding(
     binding: &CueLightBindingDto,
 ) -> anyhow::Result<()> {
     let conn = db.connect()?;
-    let json = serde_json::to_string(binding)
-        .context("failed to serialize CueLight binding")?;
+    let json = serde_json::to_string(binding).context("failed to serialize CueLight binding")?;
     conn.execute(
         "UPDATE workspaces SET cuelight_binding_json = ?2 WHERE id = ?1",
         rusqlite::params![workspace_id, json],
@@ -477,8 +476,8 @@ pub fn get_cuelight_binding(
 
     match json {
         Some(s) if !s.is_empty() => {
-            let binding: CueLightBindingDto = serde_json::from_str(&s)
-                .context("failed to deserialize CueLight binding")?;
+            let binding: CueLightBindingDto =
+                serde_json::from_str(&s).context("failed to deserialize CueLight binding")?;
             Ok(Some(binding))
         }
         _ => Ok(None),

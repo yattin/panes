@@ -56,7 +56,7 @@ export function CueLightProjectPicker({ workspaceId, onProjectSelected }: CueLig
         path: "/api/projects",
         authToken: token,
       });
-      const list = Array.isArray(result) ? result : (result as any)?.data ?? [];
+      const list = Array.isArray(result) ? result : (result as any)?.items ?? (result as any)?.data ?? [];
       setProjects(
         list.map((p: any) => ({
           id: p.id,

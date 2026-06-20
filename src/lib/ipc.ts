@@ -339,6 +339,11 @@ export const ipc = {
   prewarmEngine: (engineId: string) => invoke<void>("prewarm_engine", { engineId }),
   runEngineCheck: (engineId: string, command: string) =>
     invoke<EngineCheckResult>("run_engine_check", { engineId, command }),
+  compactNativeThread: (engineThreadId: string) =>
+    invoke<[number, number]>("compact_native_thread", { engineThreadId }),
+  getNativeHistoryTokens: (engineThreadId: string) =>
+    invoke<number>("get_native_history_tokens", { engineThreadId }),
+  getContextMaxTokens: () => invoke<number>("get_context_max_tokens"),
   listCodexSkills: (cwd: string) =>
     invoke<CodexSkill[]>("list_codex_skills", { cwd }),
   listCodexApps: () => invoke<CodexApp[]>("list_codex_apps"),

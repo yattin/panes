@@ -6,13 +6,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use tokio::{
-    process::Command,
-    sync::OnceCell,
-    time::Duration,
-};
 #[cfg(not(target_os = "windows"))]
 use tokio::time::timeout;
+use tokio::{process::Command, sync::OnceCell, time::Duration};
 
 #[cfg_attr(target_os = "windows", allow(dead_code))]
 const LOGIN_ENV_PROBE_TIMEOUT: Duration = Duration::from_secs(3);

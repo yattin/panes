@@ -85,8 +85,12 @@ pub async fn cuelight_proxy(
         return Ok(Value::Null);
     }
 
-    serde_json::from_str(&text)
-        .map_err(|_| format!("invalid JSON from CueLight: {}", text.chars().take(200).collect::<String>()))
+    serde_json::from_str(&text).map_err(|_| {
+        format!(
+            "invalid JSON from CueLight: {}",
+            text.chars().take(200).collect::<String>()
+        )
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -129,12 +133,10 @@ pub async fn unbind_cuelight_project(
     workspace_id: String,
 ) -> Result<(), String> {
     let db = state.db.clone();
-    tokio::task::spawn_blocking(move || {
-        db::workspaces::clear_cuelight_binding(&db, &workspace_id)
-    })
-    .await
-    .map_err(|e| format!("task join error: {}", e))?
-    .map_err(|e| format!("failed to clear CueLight binding: {}", e))
+    tokio::task::spawn_blocking(move || db::workspaces::clear_cuelight_binding(&db, &workspace_id))
+        .await
+        .map_err(|e| format!("task join error: {}", e))?
+        .map_err(|e| format!("failed to clear CueLight binding: {}", e))
 }
 
 /// 获取工作区的 CueLight 绑定信息
@@ -144,12 +146,10 @@ pub async fn get_cuelight_binding(
     workspace_id: String,
 ) -> Result<Option<CueLightBindingDto>, String> {
     let db = state.db.clone();
-    tokio::task::spawn_blocking(move || {
-        db::workspaces::get_cuelight_binding(&db, &workspace_id)
-    })
-    .await
-    .map_err(|e| format!("task join error: {}", e))?
-    .map_err(|e| format!("failed to read CueLight binding: {}", e))
+    tokio::task::spawn_blocking(move || db::workspaces::get_cuelight_binding(&db, &workspace_id))
+        .await
+        .map_err(|e| format!("task join error: {}", e))?
+        .map_err(|e| format!("failed to read CueLight binding: {}", e))
 }
 
 /// 设置全局 CueLight 认证 Token（由前端调用）

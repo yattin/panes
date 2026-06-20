@@ -114,4 +114,65 @@ describe("renderMarkdownToHtml", () => {
     expect(html).toContain("<hr>");
     expect(html).toContain("&lt;kbd&gt;Cmd&lt;/kbd&gt;");
   });
+
+  it("renders GFM tables correctly", () => {
+    const md = [
+      "| A | B |",
+      "|---|---|",
+      "| 1 | 2 |",
+    ].join("\n");
+    const html = renderMarkdownToHtml(md);
+
+    expect(html).toContain("<table>");
+    expect(html).toContain("<thead>");
+    expect(html).toContain("<th>A</th>");
+    expect(html).toContain("<tbody>");
+    expect(html).toContain("<td>1</td>");
+  });
+
+  it("renders GFM tables with Chinese content", () => {
+    const md = [
+      "| 模块 | 状态 |",
+      "|------|------|",
+      "| 世界观 | ✅ 完成 |",
+    ].join("\n");
+    const html = renderMarkdownToHtml(md);
+
+    expect(html).toContain("<table>");
+    expect(html).toContain("<th>模块</th>");
+    expect(html).toContain("<td>世界观</td>");
+  });
+
+  it("fixes tables missing separator row by inserting it automatically", () => {
+    // AI 常见问题：缺少 |---|---| 分隔行
+    const md = [
+      "| 集数 | 标题 | 剧本 |",
+      "| 第1集 | 实战课题 | 完成 |",
+      "| 第2集 | 废墟试炼 | 完成 |",
+    ].join("\n");
+    const html = renderMarkdownToHtml(md);
+
+    // 应该自动插入分隔行并正确渲染
+    expect(html).toContain("<table>");
+    expect(html).toContain("<th>集数</th>");
+    expect(html).toContain("<td>第1集</td>");
+  });
+
+  it("fixes complex tables with many columns", () => {
+    // 测试多列表格
+    const md = [
+      "| 集数 | 标题 | 剧本 | 分镜数 | 视频进度 |",
+      "| 第1集 | 定格谭警车 | 完成 | 9个 | 33% |",
+      "| 第2集 | 废墟试炼 | 完成 | 7个 | 0% |",
+    ].join("\n");
+    const html = renderMarkdownToHtml(md);
+
+    expect(html).toContain("<table>");
+    expect(html).toContain("<th>集数</th>");
+    expect(html).toContain("<th>视频进度</th>");
+    expect(html).toContain("<td>第1集</td>");
+    expect(html).toContain("<td>33%</td>");
+    // 确保分隔行不会显示为文本
+    expect(html).not.toContain("| --- |");
+  });
 });

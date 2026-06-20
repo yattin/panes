@@ -1,5 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { KeyRound, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { CUELIGHT_SERVER_URL, getCueLightToken, setCueLightToken } from "../../lib/cueLightConfig";
 import { ipc } from "../../lib/ipc";
 
@@ -43,6 +45,8 @@ export function CueLightTokenGate({ children }: CueLightTokenGateProps) {
       setCueLightToken(trimmedToken);
       await ipc.setCueLightAuthToken(trimmedToken);
       setHasToken(true);
+      // 验证成功后最大化窗口
+      getCurrentWindow().maximize().catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "验证失败，请检查 Token 是否正确");
     } finally {
@@ -108,7 +112,15 @@ export function CueLightTokenGate({ children }: CueLightTokenGateProps) {
         </div>
 
         <p className="cuelight-token-gate-hint">
-          服务器地址：{CUELIGHT_SERVER_URL}
+          还没有 API Key？
+          <button
+            type="button"
+            className="cuelight-token-gate-link"
+            onClick={() => void open(CUELIGHT_SERVER_URL)}
+          >
+            <ExternalLink size={12} />
+            点击这里获取
+          </button>
         </p>
       </div>
     </div>

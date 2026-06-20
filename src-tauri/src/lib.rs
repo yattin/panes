@@ -34,11 +34,11 @@ use locale::resolve_app_locale;
 use models::{EngineRuntimeUpdatedDto, ThreadDto, ThreadStatusDto};
 use power::KeepAwakeManager;
 use state::{AppState, TurnManager};
+#[cfg(not(target_os = "windows"))]
+use tauri::image::Image;
 #[cfg(target_os = "macos")]
 use tauri::menu::{AboutMetadata, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{menu::Menu, Emitter, Manager, RunEvent, WebviewWindowBuilder};
-#[cfg(not(target_os = "windows"))]
-use tauri::image::Image;
 use terminal::TerminalManager;
 
 pub fn maybe_handle_cli_subcommand() -> anyhow::Result<bool> {
@@ -281,6 +281,9 @@ pub fn run() {
             commands::engines::list_codex_apps,
             commands::engines::get_opencode_runtime_catalog,
             commands::engines::run_engine_check,
+            commands::engines::compact_native_thread,
+            commands::engines::get_native_history_tokens,
+            commands::engines::get_context_max_tokens,
             commands::threads::list_threads,
             commands::threads::list_archived_threads,
             commands::threads::list_codex_remote_threads,

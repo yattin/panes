@@ -1,6 +1,7 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useCueLightStore, type CueLightStoryboard as StoryboardItem } from "../../stores/cueLightStore";
+import { MediaPreview } from "../shared/MediaPreview";
 
 export function CueLightStoryboard() {
   const workspace = useWorkspaceStore((s) =>
@@ -111,7 +112,10 @@ function StoryboardCard({
     storyboard.referenceCharacterIds?.includes(c.id),
   );
 
-  const videoStatus = storyboard.videoUrl
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  // 视频状态判断：根据 videoClipUrl 是否存在
+  const videoStatus = storyboard.videoClipUrl
     ? "done"
     : storyboard.status === "processing"
       ? "processing"
@@ -120,41 +124,69 @@ function StoryboardCard({
   const statusIcon =
     videoStatus === "done" ? "✅" : videoStatus === "processing" ? "⏳" : "○";
 
+  // 缩略图优先级：firstFrameThumbnailUrl → firstFrameUrl → videoCoverUrl
+  const thumbnailUrl = storyboard.firstFrameThumbnailUrl
+    ?? storyboard.firstFrameUrl
+    ?? storyboard.videoCoverUrl;
+
+  // 点击卡片打开预览
+  const handleClick = useCallback(() => {
+    if (storyboard.videoClipUrl || thumbnailUrl) {
+      setPreviewOpen(true);
+    }
+  }, [storyboard.videoClipUrl, thumbnailUrl]);
+
+  const hasMedia = storyboard.videoClipUrl || thumbnailUrl;
+
   return (
-    <div className="cuelight-storyboard-card">
-      <div className="cuelight-storyboard-thumb">
-        {storyboard.referenceImageUrl ? (
-          <img src={storyboard.referenceImageUrl} alt="" />
-        ) : (
-          <div className="cuelight-media-placeholder" />
-        )}
-        <span className="cuelight-storyboard-status">{statusIcon}</span>
+    <>
+      <div
+        className="cuelight-storyboard-card"
+        onClick={handleClick}
+        style={{ cursor: hasMedia ? "pointer" : "default" }}
+      >
+        <div className="cuelight-storyboard-thumb">
+          {thumbnailUrl ? (
+            <img src={thumbnailUrl} alt="" />
+          ) : (
+            <div className="cuelight-media-placeholder" />
+          )}
+          <span className="cuelight-storyboard-status">{statusIcon}</span>
+        </div>
+        <div className="cuelight-storyboard-info">
+          {storyboard.sceneNumber != null && (
+            <span className="cuelight-scene-number">#{storyboard.sceneNumber}</span>
+          )}
+          <p className="cuelight-storyboard-prompt">
+            {storyboard.videoPrompt
+              ? storyboard.videoPrompt.length > 60
+                ? storyboard.videoPrompt.slice(0, 60) + "..."
+                : storyboard.videoPrompt
+              : "无描述"}
+          </p>
+          {linkedChars.length > 0 && (
+            <div className="cuelight-storyboard-chars">
+              {linkedChars.map((c) => (
+                <span key={c.id} className="cuelight-char-badge" title={c.name}>
+                  {c.referenceImageUrl ? (
+                    <img src={c.referenceImageUrl} alt={c.name} />
+                  ) : (
+                    c.name.charAt(0)
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="cuelight-storyboard-info">
-        {storyboard.sceneNumber != null && (
-          <span className="cuelight-scene-number">#{storyboard.sceneNumber}</span>
-        )}
-        <p className="cuelight-storyboard-prompt">
-          {storyboard.videoPrompt
-            ? storyboard.videoPrompt.length > 60
-              ? storyboard.videoPrompt.slice(0, 60) + "..."
-              : storyboard.videoPrompt
-            : "无描述"}
-        </p>
-        {linkedChars.length > 0 && (
-          <div className="cuelight-storyboard-chars">
-            {linkedChars.map((c) => (
-              <span key={c.id} className="cuelight-char-badge" title={c.name}>
-                {c.referenceImageUrl ? (
-                  <img src={c.referenceImageUrl} alt={c.name} />
-                ) : (
-                  c.name.charAt(0)
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+
+      {previewOpen && (
+        <MediaPreview
+          url={storyboard.videoClipUrl || thumbnailUrl || ""}
+          type={storyboard.videoClipUrl ? "video" : "image"}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+    </>
   );
 }

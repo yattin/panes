@@ -59,10 +59,14 @@ export interface CueLightStoryboard {
   id: string;
   sceneNumber?: number;
   videoPrompt?: string;
-  referenceImageUrl?: string;
+  // API 实际返回的字段
+  firstFrameUrl?: string;
+  firstFrameThumbnailUrl?: string;
+  videoClipUrl?: string;
+  videoCoverUrl?: string;
+  nineGridImageUrl?: string;
   referenceCharacterIds?: string[];
   sceneId?: string;
-  videoUrl?: string;
   status?: string;
   [key: string]: unknown;
 }
