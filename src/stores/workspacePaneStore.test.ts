@@ -1,30 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { configureWorkspacePaneGateway } from "../contexts/workspace-panes/application/workspacePaneGateway";
 import {
   collectWorkspacePaneLeaves,
   getWorkspacePaneActiveTab,
+  type WorkspacePaneLayout,
   useWorkspacePaneStore,
 } from "./workspacePaneStore";
 
 describe("workspacePaneStore", () => {
-  const storage = new Map<string, string>();
+  const layouts = new Map<string, WorkspacePaneLayout>();
+  let idCounter = 0;
 
   beforeEach(() => {
-    storage.clear();
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn((key: string) => storage.get(key) ?? null),
-      setItem: vi.fn((key: string, value: string) => {
-        storage.set(key, value);
-      }),
-      removeItem: vi.fn((key: string) => {
-        storage.delete(key);
-      }),
-      clear: vi.fn(() => {
-        storage.clear();
-      }),
-      key: vi.fn((index: number) => Array.from(storage.keys())[index] ?? null),
-      get length() {
-        return storage.size;
+    layouts.clear();
+    idCounter = 0;
+    configureWorkspacePaneGateway({
+      createId: (prefix) => `${prefix}-${++idCounter}`,
+      persistLayout: (workspaceId, layout) => {
+        layouts.set(workspaceId, layout);
       },
+      readLayout: (workspaceId) => layouts.get(workspaceId) ?? null,
     });
     useWorkspacePaneStore.setState({ workspaces: {} });
   });
@@ -170,5 +165,16 @@ describe("workspacePaneStore", () => {
     expect(collectWorkspacePaneLeaves(restored.root).map((restoredLeaf) =>
       getWorkspacePaneActiveTab(restoredLeaf)?.kind,
     )).toEqual(["chat", "editor"]);
+  });
+
+  it("falls back to a chat pane when no saved layout is available", () => {
+    useWorkspacePaneStore.getState().ensureWorkspace("ws-1", "chat");
+
+    const layout = useWorkspacePaneStore.getState().workspaces["ws-1"];
+    expect(layout.root.type).toBe("leaf");
+    expect(collectWorkspacePaneLeaves(layout.root).map((leaf) =>
+      getWorkspacePaneActiveTab(leaf)?.kind,
+    )).toEqual(["chat"]);
+    expect(layout.focusedLeafId).not.toBe("");
   });
 });

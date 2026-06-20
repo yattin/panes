@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
   closeGitFlyoutIfFocusLeft,
   GitFlyoutContext,
-} from "../../lib/gitFlyoutRegion";
+} from "../../contexts/git/application/gitFlyoutRegion";
 
 export interface DropdownOption {
   value: string;

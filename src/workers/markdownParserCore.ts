@@ -6,7 +6,7 @@ import {
   TEXT_LINK_PATTERN,
   isLocalFileLinkSyntax,
   trimLinkText,
-} from "../lib/localFileLinkPatterns";
+} from "../contexts/file-navigation/domain/localFileLinkPatterns";
 
 interface FenceToken {
   placeholder: string;

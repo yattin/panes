@@ -1,6 +1,5 @@
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { open } from "@tauri-apps/plugin-shell";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,14 +16,15 @@ import { useHarnessStore } from "../../stores/harnessStore";
 import { useTerminalStore } from "../../stores/terminalStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useUiStore } from "../../stores/uiStore";
-import { writeCommandToNewSession } from "../../lib/ipc";
-import { copyTextToClipboard } from "../../lib/clipboard";
-import { showWorkspaceSurface } from "../../lib/workspacePaneNavigation";
+import { copyTextToClipboard } from "../../contexts/shell-ui/application/clipboard";
+import { openExternalUrl } from "../../contexts/shell-ui/application/externalLinks";
+import { getTerminalSessionGateway } from "../../contexts/terminal-sessions/application/terminalSessionGateway";
+import { showWorkspaceSurface } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
 import {
   getHarnessInstallCommand,
   getHarnessTileAction,
-} from "../../lib/harnessInstallActions";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
+} from "../../contexts/harnesses/domain/harnessInstallActions";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
 import { getHarnessIcon } from "../shared/HarnessLogos";
 import type { HarnessInfo } from "../../types";
 
@@ -145,7 +145,7 @@ export function HarnessPanel() {
 
       const sessionId = await createSession(activeWorkspaceId);
       if (sessionId) {
-        void writeCommandToNewSession(activeWorkspaceId, sessionId, command);
+        void getTerminalSessionGateway().writeCommandToNewSession(activeWorkspaceId, sessionId, command);
       }
 
       setActiveView("chat");
@@ -181,7 +181,7 @@ export function HarnessPanel() {
   }
 
   function handleOpenWebsite(website: string) {
-    void open(website).catch(() => {
+    void openExternalUrl(website).catch(() => {
       void import("../../stores/toastStore").then(({ toast }) => {
         toast.error(t("harnesses.websiteOpenFailed"));
       });

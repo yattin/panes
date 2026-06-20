@@ -1,6 +1,6 @@
 import { Dropdown } from "./Dropdown";
-import { cycleWorkspaceTerminalLayout } from "../../lib/workspacePaneNavigation";
-import { runEditMenuAction } from "../../lib/nativeEditActions";
+import { cycleWorkspaceTerminalLayout } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
+import { runEditMenuAction } from "../../contexts/shell-ui/application/nativeEditActions";
 import { useOnboardingStore } from "../../stores/onboardingStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
@@ -9,14 +9,14 @@ import {
   canCustomWindowResize,
   shouldShowCustomWindowChrome,
   type CustomWindowFrameState,
-} from "../../lib/customWindowFrame";
+} from "../../contexts/shell-ui/domain/customWindowFrame";
 import {
   closeCurrentWindow,
   minimizeCurrentWindow,
   toggleCurrentWindowMaximize,
   toggleWindowFullscreen,
-} from "../../lib/windowActions";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
+} from "../../contexts/shell-ui/application/windowActions";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
 import { CustomWindowResizeHandles } from "./CustomWindowResizeHandles";
 
 interface CustomWindowFrameProps {

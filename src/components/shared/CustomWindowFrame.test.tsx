@@ -12,7 +12,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../../lib/windowActions", () => ({
+vi.mock("../../contexts/shell-ui/application/windowActions", () => ({
   closeCurrentWindow: mockCloseCurrentWindow,
   minimizeCurrentWindow: mockMinimizeCurrentWindow,
   requestWindowClose: vi.fn(),

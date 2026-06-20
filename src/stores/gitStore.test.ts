@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GitDiffPreview, GitStatus, GitWorktree } from "../types";
+import type { GitBranch, GitDiffPreview, GitStatus, GitWorktree } from "../types";
 
 const mockIpc = vi.hoisted(() => ({
   getGitStatus: vi.fn(),
@@ -33,6 +33,8 @@ vi.mock("../lib/ipc", () => ({
   ipc: mockIpc,
 }));
 
+import { configureGitGateway } from "../contexts/git/application/gitGateway";
+import { gitGateway } from "../contexts/git/infrastructure/gitRepository";
 import { useGitStore } from "./gitStore";
 
 function makeStatus(branch: string, files: GitStatus["files"] = []): GitStatus {
@@ -70,6 +72,8 @@ async function flushPromises() {
 describe("gitStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    configureGitGateway(gitGateway);
 
     mockIpc.getGitStatus.mockResolvedValue(makeStatus("main"));
     mockIpc.getFileDiff.mockResolvedValue(makeDiffPreview());
@@ -123,6 +127,10 @@ describe("gitStore", () => {
       activeView: "changes",
       branchScope: "local",
       branches: [],
+      branchesTotal: 0,
+      branchesHasMore: false,
+      branchesOffset: 0,
+      branchSearch: "",
       commits: [],
       commitsOffset: 0,
       commitsHasMore: false,
@@ -132,6 +140,12 @@ describe("gitStore", () => {
       mainRepoPath: null,
       selectedCommitHash: undefined,
       commitDiff: undefined,
+      drafts: {
+        commitMessage: "",
+        branchName: "",
+        commitHistory: [],
+        branchHistory: [],
+      },
     });
   });
 
@@ -208,6 +222,79 @@ describe("gitStore", () => {
     expect(useGitStore.getState().status?.files[0]?.path).toBe("a.ts");
   });
 
+  it("starts a fresh status request for forced refresh while another request is in flight", async () => {
+    const repoPath = "/repo-force-refresh";
+    const firstStatus = deferred<GitStatus>();
+    mockIpc.getGitStatus
+      .mockReturnValueOnce(firstStatus.promise)
+      .mockResolvedValueOnce(makeStatus("forced-branch"));
+
+    const firstRefresh = useGitStore.getState().refresh(repoPath);
+    await flushPromises();
+    expect(mockIpc.getGitStatus).toHaveBeenCalledTimes(1);
+
+    const forcedRefresh = useGitStore.getState().refresh(repoPath, { force: true });
+    await flushPromises();
+
+    expect(mockIpc.getGitStatus).toHaveBeenCalledTimes(2);
+    await forcedRefresh;
+    expect(useGitStore.getState().status?.branch).toBe("forced-branch");
+
+    firstStatus.resolve(makeStatus("stale-branch"));
+    await firstRefresh;
+    expect(useGitStore.getState().status?.branch).toBe("forced-branch");
+  });
+
+  it("refreshes the selected file diff during a forced changes refresh", async () => {
+    const repoPath = "/repo-force-diff";
+    const filePath = "src/app.ts";
+    mockIpc.getFileDiff
+      .mockResolvedValueOnce(makeDiffPreview("old diff"))
+      .mockResolvedValueOnce(makeDiffPreview("new diff"));
+    mockIpc.getGitStatus.mockResolvedValue(
+      makeStatus("main", [{ path: filePath, worktreeStatus: "modified" }]),
+    );
+
+    await useGitStore.getState().selectFile(repoPath, filePath, false);
+    expect(useGitStore.getState().diff?.content).toBe("old diff");
+
+    await useGitStore.getState().refresh(repoPath, { force: true });
+
+    expect(mockIpc.getFileDiff).toHaveBeenCalledTimes(2);
+    expect(mockIpc.getFileDiff).toHaveBeenLastCalledWith(repoPath, filePath, false);
+    expect(useGitStore.getState().diff?.content).toBe("new diff");
+  });
+
+  it("keeps the forced selected file diff when an earlier diff response resolves later", async () => {
+    const repoPath = "/repo-stale-diff";
+    const filePath = "src/app.ts";
+    const staleDiff = deferred<GitDiffPreview>();
+    mockIpc.getFileDiff
+      .mockReturnValueOnce(staleDiff.promise)
+      .mockResolvedValueOnce(makeDiffPreview("forced diff"));
+    mockIpc.getGitStatus.mockResolvedValue(
+      makeStatus("main", [{ path: filePath, worktreeStatus: "modified" }]),
+    );
+    useGitStore.setState({
+      activeView: "changes",
+      selectedFile: filePath,
+      selectedFileStaged: false,
+      diff: makeDiffPreview("initial diff"),
+    });
+
+    const staleSelect = useGitStore.getState().selectFile(repoPath, filePath, false);
+    await flushPromises();
+    expect(mockIpc.getFileDiff).toHaveBeenCalledTimes(1);
+
+    await useGitStore.getState().refresh(repoPath, { force: true });
+    expect(useGitStore.getState().diff?.content).toBe("forced diff");
+
+    staleDiff.resolve(makeDiffPreview("stale diff"));
+    await staleSelect;
+
+    expect(useGitStore.getState().diff?.content).toBe("forced diff");
+  });
+
   it("falls back to the main repo after removing the active worktree", async () => {
     const mainRepoPath = "/repo-main";
     const worktreePath = "/repo-main/.panes/worktrees/feature";
@@ -245,5 +332,112 @@ describe("gitStore", () => {
     expect(useGitStore.getState().activeRepoPath).toBe(mainRepoPath);
     expect(useGitStore.getState().mainRepoPath).toBeNull();
     expect(mockIpc.getGitStatus).toHaveBeenLastCalledWith(mainRepoPath);
+  });
+
+  it("normalizes stored git draft history before showing suggestions", () => {
+    const storedDrafts = {
+      commitMessage: "in progress",
+      branchName: "feature/new-panel",
+      commitHistory: ["  fix panel layout  ", "", "ship git pane", "fix panel layout", "older"],
+      branchHistory: ["  feature/new-panel  ", "", "main", "feature/new-panel"],
+    };
+    const localStorageMock = {
+      getItem: vi.fn(() => JSON.stringify(storedDrafts)),
+      setItem: vi.fn(),
+    };
+    vi.stubGlobal("localStorage", localStorageMock);
+
+    useGitStore.getState().loadDraftsForWorkspace("workspace-1");
+
+    expect(localStorageMock.getItem).toHaveBeenCalledWith("panes:git.drafts:workspace-1");
+    expect(useGitStore.getState().drafts).toEqual({
+      commitMessage: "in progress",
+      branchName: "feature/new-panel",
+      commitHistory: ["fix panel layout", "ship git pane", "older"],
+      branchHistory: ["feature/new-panel", "main"],
+    });
+  });
+
+  it("loads branch pages with safe pagination defaults", async () => {
+    const branch = {
+      name: "feature/git-context",
+      fullName: "feature/git-context",
+      isCurrent: false,
+      isRemote: false,
+      ahead: 0,
+      behind: 0,
+    } satisfies GitBranch;
+    mockIpc.listGitBranches.mockResolvedValueOnce({ entries: [branch] });
+
+    await useGitStore.getState().loadBranches("/repo");
+
+    expect(useGitStore.getState().branches).toEqual([branch]);
+    expect(useGitStore.getState().branchesTotal).toBe(1);
+    expect(useGitStore.getState().branchesOffset).toBe(1);
+    expect(useGitStore.getState().branchesHasMore).toBe(false);
+  });
+
+  it("refreshes branches after the branch scope changes", async () => {
+    const localBranch = {
+      name: "main",
+      fullName: "main",
+      isCurrent: true,
+      isRemote: false,
+      ahead: 0,
+      behind: 0,
+    } satisfies GitBranch;
+    const remoteBranch = {
+      name: "origin/main",
+      fullName: "refs/remotes/origin/main",
+      isCurrent: false,
+      isRemote: true,
+      ahead: 0,
+      behind: 0,
+    } satisfies GitBranch;
+    mockIpc.listGitBranches
+      .mockResolvedValueOnce({
+        entries: [localBranch],
+        offset: 0,
+        limit: 200,
+        total: 1,
+        hasMore: false,
+      })
+      .mockResolvedValueOnce({
+        entries: [remoteBranch],
+        offset: 0,
+        limit: 200,
+        total: 1,
+        hasMore: false,
+      });
+
+    useGitStore.getState().setActiveView("branches");
+    await useGitStore.getState().refresh("/repo");
+    expect(useGitStore.getState().branches).toEqual([localBranch]);
+
+    useGitStore.getState().setBranchScope("remote");
+    await useGitStore.getState().refresh("/repo");
+
+    expect(mockIpc.listGitBranches).toHaveBeenCalledTimes(2);
+    expect(mockIpc.listGitBranches).toHaveBeenLastCalledWith(
+      "/repo",
+      "remote",
+      0,
+      200,
+      undefined,
+    );
+    expect(useGitStore.getState().branches).toEqual([remoteBranch]);
+  });
+
+  it("treats whitespace-only branch search as an empty query", async () => {
+    await useGitStore.getState().setBranchSearch("/repo", "   ");
+
+    expect(mockIpc.listGitBranches).toHaveBeenCalledWith(
+      "/repo",
+      "local",
+      0,
+      200,
+      undefined,
+    );
+    expect(useGitStore.getState().branchSearch).toBe("");
   });
 });

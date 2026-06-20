@@ -6,12 +6,12 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { recordPerfMetric } from "../../lib/perfTelemetry";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 import {
   classifyLinkTarget,
   getWorkspacePaneLeafIdFromEventTarget,
   navigateLinkTarget,
-} from "../../lib/fileLinkNavigation";
+} from "../../contexts/file-navigation/application/fileLinkNavigation";
 import { renderMarkdownToHtml } from "../../workers/markdownParserCore";
 import type {
   MarkdownParseWorkerRequest,
@@ -291,7 +291,7 @@ export default function MarkdownContent({
         }
         writeCachedMarkdownHtml(cacheKey, html);
         setWorkerHtml(html);
-        recordPerfMetric("chat.markdown.worker.ms", performance.now() - parseStartedAtRef.current, {
+        getChatGateway().recordMetric("chat.markdown.worker.ms", performance.now() - parseStartedAtRef.current, {
           chars: content.length,
           cached: false,
         });

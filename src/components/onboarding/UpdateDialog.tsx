@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 import {
   RefreshCw,
@@ -10,6 +9,7 @@ import {
   Check,
 } from "lucide-react";
 import { useUpdateStore } from "../../stores/updateStore";
+import { getAppVersion } from "../../contexts/shell-ui/application/appInfo";
 
 interface UpdateDialogProps {
   open: boolean;
@@ -202,7 +202,7 @@ function IdleState({
   const { t } = useTranslation(["app", "common"]);
   const [ver, setVer] = useState<string | null>(null);
   useEffect(() => {
-    void getVersion().then(setVer);
+    void getAppVersion().then(setVer);
   }, []);
 
   return (

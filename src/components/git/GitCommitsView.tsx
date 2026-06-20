@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { GitCommitHorizontal, Loader2, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { formatDateTime } from "../../lib/formatters";
+import { formatDateTime } from "../../contexts/shell-ui/application/formatters";
 import { useGitStore } from "../../stores/gitStore";
 import { DiffPanel } from "./GitChangesView";
 import type { Repo } from "../../types";

@@ -12,9 +12,9 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import { ipc } from "../../lib/ipc";
-import { formatShortDate } from "../../lib/formatters";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
+import { formatShortDate } from "../../contexts/shell-ui/application/formatters";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
+import { getWorkspaceGateway } from "../../contexts/workspaces/application/workspaceGateway";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useUiStore } from "../../stores/uiStore";
 import { toast } from "../../stores/toastStore";
@@ -70,7 +70,7 @@ export function WorkspaceSettingsPage() {
     if (!workspace || isActive) return;
     let cancelled = false;
     setReposLoading(true);
-    ipc
+    getWorkspaceGateway()
       .getRepos(workspace.id)
       .then((r) => { if (!cancelled) setLocalRepos(r); })
       .catch(() => { if (!cancelled) setLocalRepos([]); })
@@ -116,7 +116,7 @@ export function WorkspaceSettingsPage() {
     setDepthSaving(true);
     try {
       const updated = await storeRescan(workspace.id, n);
-      if (!isActive) setLocalRepos(await ipc.getRepos(workspace.id));
+      if (!isActive) setLocalRepos(await getWorkspaceGateway().getRepos(workspace.id));
       if (updated) setDepthDraft(String(updated.scanDepth));
       toast.success(t("toasts.rescanned"));
     } catch {
@@ -131,7 +131,7 @@ export function WorkspaceSettingsPage() {
     setDepthSaving(true);
     try {
       await storeRescan(workspace.id);
-      if (!isActive) setLocalRepos(await ipc.getRepos(workspace.id));
+      if (!isActive) setLocalRepos(await getWorkspaceGateway().getRepos(workspace.id));
       toast.success(t("toasts.reposRescanned"));
     } catch {
       toast.error(t("toasts.rescanFailed"));
@@ -146,7 +146,7 @@ export function WorkspaceSettingsPage() {
       if (isActive) {
         await storeSetTrust(repoId, level);
       } else {
-        await ipc.setRepoTrustLevel(repoId, level);
+        await getWorkspaceGateway().setRepoTrustLevel(repoId, level);
         setLocalRepos((p) => (p ?? []).map((r) => (r.id === repoId ? { ...r, trustLevel: level } : r)));
       }
     } catch {
@@ -160,7 +160,7 @@ export function WorkspaceSettingsPage() {
       if (isActive) {
         await storeSetGitActive(repoId, on);
       } else {
-        await ipc.setRepoGitActive(repoId, on);
+        await getWorkspaceGateway().setRepoGitActive(repoId, on);
         setLocalRepos((p) => (p ?? []).map((r) => (r.id === repoId ? { ...r, isActive: on } : r)));
       }
     } catch {
@@ -174,7 +174,7 @@ export function WorkspaceSettingsPage() {
       if (isActive) {
         await storeSetAllTrust(level);
       } else {
-        await Promise.all(repos.map((r) => ipc.setRepoTrustLevel(r.id, level)));
+        await Promise.all(repos.map((r) => getWorkspaceGateway().setRepoTrustLevel(r.id, level)));
         setLocalRepos((p) => (p ?? []).map((r) => ({ ...r, trustLevel: level })));
       }
     } catch {
@@ -201,7 +201,7 @@ export function WorkspaceSettingsPage() {
   async function revealWorkspace() {
     if (!workspace) return;
     try {
-      await ipc.revealPath(workspace.rootPath);
+      await getWorkspaceGateway().revealWorkspacePath(workspace.rootPath);
     } catch {
       toast.error(t("toasts.revealFailed"));
     }

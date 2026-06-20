@@ -21,11 +21,6 @@ const mockWorkspaceState = vi.hoisted(() => ({
   activeWorkspaceId: "ws-1" as string | null,
 }));
 
-vi.mock("../../lib/ipc", () => ({
-  ipc: {},
-  writeCommandToNewSession: vi.fn(),
-}));
-
 vi.mock("../../stores/uiStore", () => ({
   useUiStore: {
     getState: () => mockUiState,
@@ -99,6 +94,18 @@ vi.mock("../../stores/terminalStore", () => ({
 }));
 
 vi.mock("../../stores/workspacePaneStore", () => ({
+  collectWorkspacePaneLeaves: vi.fn(() => []),
+  getWorkspacePaneActiveTab: vi.fn(() => null),
+  useWorkspacePaneStore: {
+    getState: () => ({
+      showSurface: mockShowSurface,
+      applyLegacyLayoutMode: vi.fn(),
+      workspaces: {},
+    }),
+  },
+}));
+
+vi.mock("../../contexts/workspace-panes/application/workspacePaneStore", () => ({
   collectWorkspacePaneLeaves: vi.fn(() => []),
   getWorkspacePaneActiveTab: vi.fn(() => null),
   useWorkspacePaneStore: {

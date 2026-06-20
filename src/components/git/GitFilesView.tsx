@@ -9,8 +9,8 @@ import {
   Search,
   Loader2,
 } from "lucide-react";
-import { ipc } from "../../lib/ipc";
-import { showWorkspaceEditorForDirectFileOpen } from "../../lib/workspacePaneNavigation";
+import { getFileEditorGateway } from "../../contexts/file-editor/application/fileEditorGateway";
+import { showWorkspaceEditorForDirectFileOpen } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
 import { useFileStore } from "../../stores/fileStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import type { FileTreeEntry } from "../../types";
@@ -101,7 +101,7 @@ export function GitFilesView({ rootPath }: Props) {
       else setLoadingDirs((prev) => new Set(prev).add(dirPath));
 
       try {
-        const entries = await ipc.listDir(rootPath, dirPath);
+        const entries = await getFileEditorGateway().listDir(rootPath, dirPath);
         setDirContents((prev) => {
           const next = new Map(prev);
           next.set(dirPath, entries);

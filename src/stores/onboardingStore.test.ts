@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  OnboardingChatEngineId,
+  OnboardingWorkflowPreference,
+} from "../types";
+import {
+  DEFAULT_CHAT_ENGINES,
+  normalizeOnboardingChatEngines,
+  normalizeOnboardingWorkflow,
+} from "../contexts/onboarding/domain/onboardingPreferences";
 
 const mockIpc = vi.hoisted(() => ({
   installDependency: vi.fn(),
@@ -7,12 +16,8 @@ const mockIpc = vi.hoisted(() => ({
 
 const mockListenInstallProgress = vi.hoisted(() => vi.fn());
 
-vi.mock("../lib/ipc", () => ({
-  ipc: mockIpc,
-  listenInstallProgress: mockListenInstallProgress,
-}));
-
 type OnboardingStoreModule = typeof import("./onboardingStore");
+type OnboardingGatewayModule = typeof import("../contexts/onboarding/application/onboardingGateway");
 
 function createStorageStub() {
   const storage = new Map<string, string>();
@@ -33,15 +38,32 @@ function createStorageStub() {
 describe("onboardingStore", () => {
   let useOnboardingStore: OnboardingStoreModule["useOnboardingStore"];
   let readStoredOnboardingState: OnboardingStoreModule["readStoredOnboardingState"];
+  let configureOnboardingGateway: OnboardingGatewayModule["configureOnboardingGateway"];
   let LEGACY_SETUP_COMPLETED_KEY: OnboardingStoreModule["LEGACY_SETUP_COMPLETED_KEY"];
   let ONBOARDING_CHAT_ENGINES_KEY: OnboardingStoreModule["ONBOARDING_CHAT_ENGINES_KEY"];
   let ONBOARDING_COMPLETED_KEY: OnboardingStoreModule["ONBOARDING_COMPLETED_KEY"];
   let ONBOARDING_WORKFLOW_KEY: OnboardingStoreModule["ONBOARDING_WORKFLOW_KEY"];
+  let storage: ReturnType<typeof createStorageStub>;
+
+  function readBooleanKey(key: string): boolean {
+    return storage.getItem(key) === "1";
+  }
+
+  function normalizeWorkflow(value: string | null): OnboardingWorkflowPreference | null {
+    return normalizeOnboardingWorkflow(value);
+  }
+
+  function normalizeChatEngines(value: unknown): OnboardingChatEngineId[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return normalizeOnboardingChatEngines(value);
+  }
 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    vi.stubGlobal("localStorage", createStorageStub());
+    storage = createStorageStub();
     mockListenInstallProgress.mockResolvedValue(() => undefined);
 
     ({
@@ -52,6 +74,41 @@ describe("onboardingStore", () => {
       readStoredOnboardingState,
       useOnboardingStore,
     } = await import("./onboardingStore"));
+    ({ configureOnboardingGateway } = await import("../contexts/onboarding/application/onboardingGateway"));
+    configureOnboardingGateway({
+      checkDependencies: vi.fn(),
+      installDependency: mockIpc.installDependency,
+      installHarness: mockIpc.installHarness,
+      listenInstallProgress: mockListenInstallProgress,
+      readStoredOnboardingState: () => {
+        const rawEngines = storage.getItem(ONBOARDING_CHAT_ENGINES_KEY);
+        return {
+          completed: readBooleanKey(ONBOARDING_COMPLETED_KEY),
+          legacyCompleted: readBooleanKey(LEGACY_SETUP_COMPLETED_KEY),
+          preferredWorkflow: normalizeWorkflow(storage.getItem(ONBOARDING_WORKFLOW_KEY)),
+          selectedChatEngines: rawEngines === null
+            ? [...DEFAULT_CHAT_ENGINES]
+            : normalizeChatEngines(JSON.parse(rawEngines)),
+        };
+      },
+      writeOnboardingChatEngines: (engines) => {
+        storage.setItem(ONBOARDING_CHAT_ENGINES_KEY, JSON.stringify(normalizeChatEngines(engines)));
+      },
+      writeOnboardingCompleted: (value) => {
+        if (value) {
+          storage.setItem(ONBOARDING_COMPLETED_KEY, "1");
+        } else {
+          storage.removeItem(ONBOARDING_COMPLETED_KEY);
+        }
+      },
+      writeOnboardingWorkflow: (workflow) => {
+        if (workflow) {
+          storage.setItem(ONBOARDING_WORKFLOW_KEY, workflow);
+        } else {
+          storage.removeItem(ONBOARDING_WORKFLOW_KEY);
+        }
+      },
+    });
 
     useOnboardingStore.setState({
       open: false,
@@ -67,13 +124,9 @@ describe("onboardingStore", () => {
     });
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("loads and normalizes saved onboarding preferences", () => {
-    localStorage.setItem(ONBOARDING_WORKFLOW_KEY, "chat");
-    localStorage.setItem(
+    storage.setItem(ONBOARDING_WORKFLOW_KEY, "chat");
+    storage.setItem(
       ONBOARDING_CHAT_ENGINES_KEY,
       JSON.stringify(["opencode", "claude", "invalid", "codex", "claude"]),
     );
@@ -92,14 +145,14 @@ describe("onboardingStore", () => {
       .getState()
       .setSelectedChatEngines(["opencode", "claude", "codex", "claude"]);
 
-    expect(localStorage.getItem(ONBOARDING_WORKFLOW_KEY)).toBe("chat");
-    expect(localStorage.getItem(ONBOARDING_CHAT_ENGINES_KEY)).toBe(
+    expect(storage.getItem(ONBOARDING_WORKFLOW_KEY)).toBe("chat");
+    expect(storage.getItem(ONBOARDING_CHAT_ENGINES_KEY)).toBe(
       JSON.stringify(["codex", "claude", "opencode"]),
     );
   });
 
   it("tracks legacy completion separately from the new onboarding flag", () => {
-    localStorage.setItem(LEGACY_SETUP_COMPLETED_KEY, "1");
+    storage.setItem(LEGACY_SETUP_COMPLETED_KEY, "1");
 
     expect(readStoredOnboardingState()).toEqual({
       completed: false,
@@ -120,7 +173,7 @@ describe("onboardingStore", () => {
 
     expect(ok).toBe(true);
     expect(mockIpc.installHarness).toHaveBeenCalledWith("codex");
-    expect(localStorage.getItem(ONBOARDING_COMPLETED_KEY)).toBe("1");
+    expect(storage.getItem(ONBOARDING_COMPLETED_KEY)).toBe("1");
     expect(useOnboardingStore.getState().isCompleted()).toBe(true);
   });
 

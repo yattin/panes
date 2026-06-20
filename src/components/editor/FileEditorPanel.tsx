@@ -4,15 +4,15 @@ import { useTranslation } from "react-i18next";
 import {
   resolveOwningRepoForAbsolutePath,
   resolveRelativePathWithinRoot,
-} from "../../lib/fileRootUtils";
-import { ipc } from "../../lib/ipc";
-import { isMarkdownPreviewFile } from "../../lib/editorFileTypes";
+} from "../../contexts/file-navigation/domain/pathRoots";
+import { getFileEditorGateway } from "../../contexts/file-editor/application/fileEditorGateway";
+import { isMarkdownPreviewFile } from "../../contexts/file-editor/domain/editorFileTypes";
 import { useFileStore } from "../../stores/fileStore";
 import { useTerminalStore } from "../../stores/terminalStore";
 import { toast } from "../../stores/toastStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { isMacDesktop } from "../../lib/windowActions";
+import { isMacDesktop } from "../../contexts/shell-ui/application/windowActions";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { GitDiffEditorPanel } from "./GitDiffEditorPanel";
@@ -130,7 +130,7 @@ export function FileEditorPanel({ embedded = false }: FileEditorPanelProps = {})
     }
 
     try {
-      await ipc.openPathWithDefaultApp(activeTab.absolutePath);
+      await getFileEditorGateway().openPathWithDefaultApp(activeTab.absolutePath);
     } catch {
       toast.error(t("editor.toasts.openExternalFailed"));
     }

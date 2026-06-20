@@ -59,13 +59,15 @@ class SidecarHarness {
     });
 
     this.child.once("exit", (code, signal) => {
-      const error = new Error(
-        `Claude sidecar exited before the test finished (code=${code}, signal=${signal}). stderr:\n${this.stderr}`,
-      );
-      for (const waiter of this.waiters.splice(0)) {
-        clearTimeout(waiter.timer);
-        waiter.reject(error);
-      }
+      setTimeout(() => {
+        const error = new Error(
+          `Claude sidecar exited before the test finished (code=${code}, signal=${signal}). stderr:\n${this.stderr}`,
+        );
+        for (const waiter of this.waiters.splice(0)) {
+          clearTimeout(waiter.timer);
+          waiter.reject(error);
+        }
+      }, 25);
     });
   }
 
@@ -942,7 +944,9 @@ describe("claude-agent-sdk-server sidecar", () => {
     });
   });
 
-  it("emits interrupted turn completion before exiting on SIGTERM", async () => {
+  const itHandlesPosixSignals = process.platform === "win32" ? it.skip : it;
+
+  itHandlesPosixSignals("emits interrupted turn completion before exiting on SIGTERM", async () => {
     const harness = await spawnHarness({
       steps: [
         {

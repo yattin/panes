@@ -12,11 +12,11 @@ import {
   X,
   Columns2,
 } from "lucide-react";
-import { ipc } from "../../lib/ipc";
 import { t as translate } from "../../i18n";
 import { useHarnessStore } from "../../stores/harnessStore";
 import { useTerminalStore } from "../../stores/terminalStore";
 import { toast } from "../../stores/toastStore";
+import { workspaceStartupPresets } from "../../contexts/workspaces/application/workspaceStartupPresets";
 import { Dropdown } from "../shared/Dropdown";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import type {
@@ -33,7 +33,8 @@ import type {
 import {
   resolveStartupSessionHarnessSelection,
   shouldShowStartupSplitPanelSize,
-} from "../../lib/workspaceStartupUi";
+} from "../../contexts/workspaces/domain/workspaceStartup";
+import { saveTextFile, selectTextFile } from "../../contexts/shell-ui/application/fileDialogs";
 
 type EditorMode = "builder" | "advanced";
 
@@ -558,7 +559,7 @@ export function WorkspaceStartupPresetModal({
       if (format === "json") {
         return serializeWorkspaceStartupPresetAsJson(materialized);
       }
-      return await ipc.serializeWorkspaceStartupPreset(workspace.id, materialized, format);
+      return await workspaceStartupPresets.serializeWorkspaceStartupPreset(workspace.id, materialized, format);
     },
     [harnessNamesById, workspace.id],
   );
@@ -571,7 +572,7 @@ export function WorkspaceStartupPresetModal({
   );
 
   const refreshLiveSessionCount = useCallback(async () => {
-    const sessions = await ipc.terminalListSessions(workspace.id);
+    const sessions = await workspaceStartupPresets.terminalListSessions(workspace.id);
     setLiveSessionCount(sessions.length);
     return sessions.length;
   }, [workspace.id]);
@@ -582,8 +583,8 @@ export function WorkspaceStartupPresetModal({
     setLoading(true);
     try {
       const [preset, sessions] = await Promise.all([
-        ipc.getWorkspaceStartupPreset(workspace.id),
-        ipc.terminalListSessions(workspace.id),
+        workspaceStartupPresets.getWorkspaceStartupPreset(workspace.id),
+        workspaceStartupPresets.terminalListSessions(workspace.id),
       ]);
       if (!canCommitWorkspaceStartupPresetLoad(requestId, loadRequestIdRef.current, openRef.current)) {
         return;
@@ -639,7 +640,7 @@ export function WorkspaceStartupPresetModal({
 
   const resolveCurrentPreset = useCallback(async (): Promise<WorkspaceStartupPreset> => {
     if (editorMode === "advanced") {
-      const normalized = await ipc.normalizeWorkspaceStartupPresetRaw(
+      const normalized = await workspaceStartupPresets.normalizeWorkspaceStartupPresetRaw(
         workspace.id,
         advancedFormat,
         advancedDraft,
@@ -649,7 +650,7 @@ export function WorkspaceStartupPresetModal({
     }
 
     const materialized = materializePresetDraft(builderDraft, harnessNamesById);
-    const normalized = await ipc.normalizeWorkspaceStartupPreset(workspace.id, materialized);
+    const normalized = await workspaceStartupPresets.normalizeWorkspaceStartupPreset(workspace.id, materialized);
     setBuilderDraft(normalizePresetDraft(normalized));
     return normalized;
   }, [advancedDraft, advancedFormat, builderDraft, editorMode, harnessNamesById, workspace.id]);
@@ -675,7 +676,7 @@ export function WorkspaceStartupPresetModal({
         return;
       }
 
-      const normalized = await ipc.normalizeWorkspaceStartupPresetRaw(
+      const normalized = await workspaceStartupPresets.normalizeWorkspaceStartupPresetRaw(
         workspace.id,
         advancedFormat,
         advancedDraft,
@@ -696,7 +697,7 @@ export function WorkspaceStartupPresetModal({
 
     try {
       if (editorMode === "advanced") {
-        const normalized = await ipc.normalizeWorkspaceStartupPresetRaw(
+        const normalized = await workspaceStartupPresets.normalizeWorkspaceStartupPresetRaw(
           workspace.id,
           advancedFormat,
           advancedDraft,
@@ -891,8 +892,8 @@ export function WorkspaceStartupPresetModal({
     setSaving(true);
     try {
       const normalized = editorMode === "advanced"
-        ? await ipc.setWorkspaceStartupPresetRaw(workspace.id, advancedFormat, advancedDraft)
-        : await ipc.setWorkspaceStartupPreset(
+        ? await workspaceStartupPresets.setWorkspaceStartupPresetRaw(workspace.id, advancedFormat, advancedDraft)
+        : await workspaceStartupPresets.setWorkspaceStartupPreset(
           workspace.id,
           materializePresetDraft(builderDraft, harnessNamesById),
         );
@@ -915,7 +916,7 @@ export function WorkspaceStartupPresetModal({
     }
     setSaving(true);
     try {
-      await ipc.clearWorkspaceStartupPreset(workspace.id);
+      await workspaceStartupPresets.clearWorkspaceStartupPreset(workspace.id);
       const emptyPreset = createEmptyPreset();
       setSavedPreset(null);
       setBuilderDraft(emptyPreset);
@@ -944,7 +945,7 @@ export function WorkspaceStartupPresetModal({
       if (!serialized) {
         throw new Error(t("startup.errors.runtimeLayoutUnavailable"));
       }
-      const normalized = await ipc.setWorkspaceStartupPreset(workspace.id, serialized);
+      const normalized = await workspaceStartupPresets.setWorkspaceStartupPreset(workspace.id, serialized);
       const canonical = normalizePresetDraft(normalized);
       setSavedPreset(canonical);
       setBuilderDraft(canonical);
@@ -1023,10 +1024,7 @@ export function WorkspaceStartupPresetModal({
       return;
     }
     try {
-      const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
-      const { readTextFile } = await import("@tauri-apps/plugin-fs");
-      const selected = await openDialog({
-        multiple: false,
+      const selected = await selectTextFile({
         title: t("startup.dialog.importTitle"),
         filters: [
           { name: t("startup.dialog.presetFiles"), extensions: ["json", "toml"] },
@@ -1034,12 +1032,12 @@ export function WorkspaceStartupPresetModal({
           { name: "TOML", extensions: ["toml"] },
         ],
       });
-      if (!selected || Array.isArray(selected)) {
+      if (!selected) {
         return;
       }
-      const format = fileFormatFromPath(selected);
-      const raw = await readTextFile(selected);
-      const normalized = await ipc.normalizeWorkspaceStartupPresetRaw(workspace.id, format, raw);
+      const format = fileFormatFromPath(selected.path);
+      const raw = selected.text;
+      const normalized = await workspaceStartupPresets.normalizeWorkspaceStartupPresetRaw(workspace.id, format, raw);
       setBuilderDraft(normalizePresetDraft(normalized));
       setAdvancedFormat(format);
       setAdvancedDraft(raw);
@@ -1057,9 +1055,7 @@ export function WorkspaceStartupPresetModal({
       const format = advancedFormat;
       const normalized = await resolveCurrentPreset();
       const raw = await serializeCurrentBuilder(format, normalized);
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      const target = await save({
+      const exported = await saveTextFile({
         title: t("startup.dialog.exportTitle"),
         defaultPath: defaultExportFilename(workspace, format),
         filters: [
@@ -1068,11 +1064,11 @@ export function WorkspaceStartupPresetModal({
             extensions: [format],
           },
         ],
+        text: raw,
       });
-      if (!target) {
+      if (!exported) {
         return;
       }
-      await writeTextFile(target, raw);
       toast.success(t("startup.toasts.exported"));
     } catch (error) {
       toast.error(t("startup.toasts.exportFailed", { error: getErrorMessage(error) }));

@@ -6,10 +6,10 @@ import { ActiveWorkspacePaneShell } from "../workspace/WorkspacePaneShell";
 import { HarnessPanel } from "../onboarding/HarnessPanel";
 import { WorkspaceSettingsPage } from "../workspace/WorkspaceSettingsPage";
 import { CueLightPanel } from "../cuelight/CueLightPanel";
-import { usesCustomWindowFrame } from "../../lib/windowActions";
+import { usesCustomWindowFrame } from "../../contexts/shell-ui/application/windowActions";
 import { useUiStore } from "../../stores/uiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
 
 const SIDEBAR_WIDTH_KEY = "panes:sidebar-width";
 const GIT_PANEL_SIZE_KEY = "panes:git-panel-size";

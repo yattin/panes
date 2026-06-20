@@ -12,7 +12,7 @@ import {
   ExternalLink,
   Scissors,
 } from "lucide-react";
-import { closeGitFlyoutIfFocusLeft, GitFlyoutContext } from "../../lib/gitFlyoutRegion";
+import { closeGitFlyoutIfFocusLeft, GitFlyoutContext } from "../../contexts/git/application/gitFlyoutRegion";
 import { getActionMenuPosition } from "./actionMenuPosition";
 import { toast } from "../../stores/toastStore";
 import { useGitStore } from "../../stores/gitStore";

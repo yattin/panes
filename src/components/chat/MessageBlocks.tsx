@@ -65,7 +65,7 @@ import {
 } from "./toolInputApproval";
 import {
   extractDiffFilename,
-} from "../../lib/parseDiff";
+} from "../../contexts/git/domain/parseDiff";
 import { getMessageBlockKey } from "./messageBlockKeys";
 import {
   VirtualizedDiffBody,
@@ -77,7 +77,7 @@ import {
   extractTextLinkMatches,
   getWorkspacePaneLeafIdFromEventTarget,
   navigateLinkTarget,
-} from "../../lib/fileLinkNavigation";
+} from "../../contexts/file-navigation/application/fileLinkNavigation";
 interface Props {
   blocks?: ContentBlock[];
   status?: MessageStatus;

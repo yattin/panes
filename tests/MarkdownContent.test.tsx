@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/lib/fileLinkNavigation", () => ({
+vi.mock("../src/contexts/file-navigation/application/fileLinkNavigation", () => ({
   classifyLinkTarget: () => "other",
   navigateLinkTarget: vi.fn(),
 }));

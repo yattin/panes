@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { normalizeDependencyReport } from "./dependencies";
-import type { AppLocale } from "./locale";
+import { normalizeDependencyReport } from "../contexts/onboarding/domain/dependencies";
+import type { AppLocale } from "../contexts/shell-ui/domain/appLocale";
 import type {
   ApprovalResponse,
   ActionOutputPayload,

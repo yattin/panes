@@ -3,10 +3,30 @@ import type { Repo, Workspace } from "../types";
 
 const mockIpc = vi.hoisted(() => ({
   archiveWorkspace: vi.fn(),
+  bindCueLightProject: vi.fn(),
+  clearWorkspaceStartupPreset: vi.fn(),
   getRepos: vi.fn(),
+  getCueLightBinding: vi.fn(),
+  getWorkspaceStartupPreset: vi.fn(),
+  hasWorkspaceGitSelection: vi.fn(),
   listArchivedWorkspaces: vi.fn(),
   listWorkspaces: vi.fn(),
+  normalizeWorkspaceStartupPreset: vi.fn(),
+  normalizeWorkspaceStartupPresetRaw: vi.fn(),
   openWorkspace: vi.fn(),
+  readLastRepoByWorkspace: vi.fn(),
+  readLastWorkspaceId: vi.fn(),
+  rememberLastRepo: vi.fn(),
+  revealWorkspacePath: vi.fn(),
+  restoreWorkspace: vi.fn(),
+  serializeWorkspaceStartupPreset: vi.fn(),
+  setRepoGitActive: vi.fn(),
+  setRepoTrustLevel: vi.fn(),
+  setWorkspaceStartupPreset: vi.fn(),
+  setWorkspaceStartupPresetRaw: vi.fn(),
+  setWorkspaceGitActiveRepos: vi.fn(),
+  unbindCueLightProject: vi.fn(),
+  writeLastWorkspaceId: vi.fn(),
 }));
 
 const mockTerminalStoreState = vi.hoisted(() => ({
@@ -18,22 +38,19 @@ const mockGitStoreState = vi.hoisted(() => ({
   loadDraftsForWorkspace: vi.fn(),
 }));
 
-vi.mock("../lib/ipc", () => ({
-  ipc: mockIpc,
-}));
-
-vi.mock("./terminalStore", () => ({
+vi.mock("../contexts/terminal-sessions/application/terminalStore", () => ({
   useTerminalStore: {
     getState: () => mockTerminalStoreState,
   },
 }));
 
-vi.mock("./gitStore", () => ({
+vi.mock("../contexts/git/application/gitStore", () => ({
   useGitStore: {
     getState: () => mockGitStoreState,
   },
 }));
 
+import { configureWorkspaceGateway } from "../contexts/workspaces/application/workspaceGateway";
 import { useWorkspaceStore } from "./workspaceStore";
 
 function makeWorkspace(id: string, rootPath: string): Workspace {
@@ -62,12 +79,9 @@ function makeRepo(id: string, workspaceId: string, path: string): Repo {
 describe("workspaceStore.removeWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-    });
+    mockIpc.readLastWorkspaceId.mockReturnValue(null);
+    mockIpc.readLastRepoByWorkspace.mockReturnValue({});
+    configureWorkspaceGateway(mockIpc);
 
     useWorkspaceStore.setState({
       workspaces: [],
@@ -121,12 +135,9 @@ describe("workspaceStore.removeWorkspace", () => {
 describe("workspaceStore.openWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-    });
+    mockIpc.readLastWorkspaceId.mockReturnValue(null);
+    mockIpc.readLastRepoByWorkspace.mockReturnValue({});
+    configureWorkspaceGateway(mockIpc);
 
     useWorkspaceStore.setState({
       workspaces: [],
@@ -157,6 +168,16 @@ describe("workspaceStore.openWorkspace", () => {
     expect(useWorkspaceStore.getState().workspaces).toEqual([openedWorkspace]);
   });
 
+  it("remembers the opened workspace as the next startup workspace", async () => {
+    const openedWorkspace = makeWorkspace("ws-opened", "/workspace/opened");
+
+    mockIpc.openWorkspace.mockResolvedValue(openedWorkspace);
+
+    await useWorkspaceStore.getState().openWorkspace("./workspace/opened");
+
+    expect(mockIpc.writeLastWorkspaceId).toHaveBeenCalledWith(openedWorkspace.id);
+  });
+
   it("returns null when opening a workspace fails", async () => {
     mockIpc.openWorkspace.mockRejectedValue(new Error("open failed"));
 
@@ -170,12 +191,9 @@ describe("workspaceStore.openWorkspace", () => {
 describe("workspaceStore.rescanWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-    });
+    mockIpc.readLastWorkspaceId.mockReturnValue(null);
+    mockIpc.readLastRepoByWorkspace.mockReturnValue({});
+    configureWorkspaceGateway(mockIpc);
 
     useWorkspaceStore.setState({
       workspaces: [],
@@ -260,18 +278,9 @@ describe("workspaceStore.rescanWorkspace", () => {
 describe("workspaceStore.loadWorkspaces", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const storage = {
-      getItem: vi.fn((key: string) => {
-        if (key === "panes:lastActiveWorkspaceId") {
-          return "ws-mount";
-        }
-        return null;
-      }),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-    };
-    vi.stubGlobal("localStorage", storage);
+    mockIpc.readLastWorkspaceId.mockReturnValue("ws-mount");
+    mockIpc.readLastRepoByWorkspace.mockReturnValue({});
+    configureWorkspaceGateway(mockIpc);
 
     useWorkspaceStore.setState({
       workspaces: [],

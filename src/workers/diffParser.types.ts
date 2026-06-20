@@ -1,4 +1,4 @@
-import type { ParsedLine } from "../lib/parseDiff";
+import type { ParsedLine } from "../contexts/git/domain/parseDiff";
 
 export interface DiffParseWorkerRequest {
   id: number;

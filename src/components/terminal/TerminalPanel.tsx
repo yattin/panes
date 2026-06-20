@@ -5,25 +5,26 @@ import { useTranslation } from "react-i18next";
 import { useHarnessStore } from "../../stores/harnessStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { toast } from "../../stores/toastStore";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
-import { isLinuxDesktop, isMacDesktop } from "../../lib/windowActions";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
+import { isLinuxDesktop, isMacDesktop } from "../../contexts/shell-ui/application/windowActions";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { getHarnessIcon } from "../shared/HarnessLogos";
-import { copyTextToClipboard, readTextFromClipboard } from "../../lib/clipboard";
+import { copyTextToClipboard, readTextFromClipboard } from "../../contexts/shell-ui/application/clipboard";
 import {
   isTerminalCopyShortcut,
   isTerminalPasteShortcut,
-} from "../../lib/terminalClipboard";
-import { resolveTerminalBootstrapAction } from "../../lib/terminalBootstrap";
+} from "../../contexts/terminal-sessions/domain/terminalClipboard";
+import { resolveTerminalBootstrapAction } from "../../contexts/terminal-sessions/domain/terminalBootstrap";
 import {
+  getTerminalAcceleratedRenderingPreference,
   getTerminalAcceleratedRenderingPreferenceVersion,
   listenTerminalAcceleratedRenderingChanged,
-} from "../../lib/terminalRenderingSettings";
+} from "../../contexts/terminal-sessions/application/terminalRenderingSettings";
 import {
   extractTextLinkMatches,
   getWorkspacePaneLeafIdFromEventTarget,
   navigateLinkTarget,
-} from "../../lib/fileLinkNavigation";
+} from "../../contexts/file-navigation/application/fileLinkNavigation";
 import {
   collectDetachedTerminalEvictionKeys,
   markPaneTerminalDetached,
@@ -34,15 +35,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { ImageAddon } from "@xterm/addon-image";
-import {
-  ipc,
-  listenTerminalExit,
-  listenTerminalForegroundChanged,
-  listenTerminalNotification,
-  listenTerminalNotificationCleared,
-  listenTerminalOutput,
-  writeCommandToNewSession,
-} from "../../lib/ipc";
+import { getTerminalSessionGateway } from "../../contexts/terminal-sessions/application/terminalSessionGateway";
 import {
   useTerminalStore,
   collectSessionIds,
@@ -594,7 +587,10 @@ async function refreshBackendRendererDiagnostics(
 ): Promise<void> {
   const cacheKey = terminalCacheKey(workspaceId, sessionId);
   try {
-    const diagnostics = await ipc.terminalGetRendererDiagnostics(workspaceId, sessionId);
+    const diagnostics = await getTerminalSessionGateway().terminalGetRendererDiagnostics(
+      workspaceId,
+      sessionId,
+    );
     cachedBackendRendererDiagnostics.set(cacheKey, {
       diagnostics,
       fetchedAt: new Date().toISOString(),
@@ -954,7 +950,7 @@ function sendResizeIfNeeded(
     pixelHeight: cellHeight * next.rows,
     recordedAt: new Date().toISOString(),
   };
-  void ipc
+  void getTerminalSessionGateway()
     .terminalResize(
       workspaceId,
       sessionId,
@@ -1074,7 +1070,7 @@ function flushTerminalInputQueue(
     }
 
     session.stdinQueueChars = Math.max(0, session.stdinQueueChars - protocolChunk.charCount);
-    void ipc
+    void getTerminalSessionGateway()
       .terminalWrite(workspaceId, sessionId, protocolChunk.payload)
       .catch(() => undefined)
       .finally(() => {
@@ -1099,7 +1095,7 @@ function flushTerminalInputQueue(
     }
 
     session.stdinQueueChars = Math.max(0, session.stdinQueueChars - batch.charCount);
-    void ipc
+    void getTerminalSessionGateway()
       .terminalWrite(workspaceId, sessionId, batch.payload)
       .catch(() => undefined)
       .finally(() => {
@@ -1126,7 +1122,7 @@ function flushTerminalInputQueue(
     0,
     session.stdinQueueChars - terminalInputChunkLength(chunk),
   );
-  void ipc
+  void getTerminalSessionGateway()
     .terminalWriteBytes(workspaceId, sessionId, chunk.data)
     .catch(() => undefined)
     .finally(() => {
@@ -1184,7 +1180,7 @@ function enqueueTerminalInput(
 ) {
   const session = cachedTerminals.get(cacheKey);
   if (!session) {
-    void ipc.terminalWrite(workspaceId, sessionId, data).catch(() => undefined);
+    void getTerminalSessionGateway().terminalWrite(workspaceId, sessionId, data).catch(() => undefined);
     return;
   }
 
@@ -1219,7 +1215,7 @@ function enqueueTerminalProtocolInput(
 ) {
   const session = cachedTerminals.get(cacheKey);
   if (!session) {
-    void ipc.terminalWrite(workspaceId, sessionId, data).catch(() => undefined);
+    void getTerminalSessionGateway().terminalWrite(workspaceId, sessionId, data).catch(() => undefined);
     return;
   }
 
@@ -1236,7 +1232,9 @@ function enqueueTerminalInputBytes(
 ) {
   const session = cachedTerminals.get(cacheKey);
   if (!session) {
-    void ipc.terminalWriteBytes(workspaceId, sessionId, data).catch(() => undefined);
+    void getTerminalSessionGateway()
+      .terminalWriteBytes(workspaceId, sessionId, data)
+      .catch(() => undefined);
     return;
   }
 
@@ -1588,7 +1586,7 @@ async function resumeSessionOutput(
 
   try {
     const fromSeq = sessionRef.lastAppliedSeq > 0 ? sessionRef.lastAppliedSeq : null;
-    const resume = await ipc.terminalResumeSession(workspaceId, sessionId, fromSeq);
+    const resume = await getTerminalSessionGateway().terminalResumeSession(workspaceId, sessionId, fromSeq);
     const latest = cachedTerminals.get(cacheKey);
     if (!latest || latest !== sessionRef) {
       return;
@@ -1756,7 +1754,7 @@ async function drainTerminalOutput(workspaceId: string, sessionId: string) {
   let retryDelayMs: number | null = null;
   try {
     const fromSeq = sessionRef.lastAppliedSeq > 0 ? sessionRef.lastAppliedSeq : null;
-    const resume = await ipc.terminalDrainOutput(
+    const resume = await getTerminalSessionGateway().terminalDrainOutput(
       workspaceId,
       sessionId,
       fromSeq,
@@ -3020,8 +3018,7 @@ export function TerminalPanel({ workspaceId, embedded = false }: TerminalPanelPr
   useEffect(() => {
     let cancelled = false;
     const requestVersion = getTerminalAcceleratedRenderingPreferenceVersion();
-    ipc
-      .getTerminalAcceleratedRendering()
+    getTerminalAcceleratedRenderingPreference()
       .then((enabled) => {
         if (
           cancelled ||
@@ -3134,7 +3131,7 @@ export function TerminalPanel({ workspaceId, embedded = false }: TerminalPanelPr
 
     let unlisten: (() => void) | null = null;
 
-    listenTerminalForegroundChanged(workspaceId, (event) => {
+    getTerminalSessionGateway().listenTerminalForegroundChanged(workspaceId, (event) => {
       const groups = useTerminalStore.getState().workspaces[workspaceId]?.groups ?? [];
       const group = groups.find((g) => collectSessionIds(g.root).includes(event.sessionId));
       if (!group) return;
@@ -3642,21 +3639,21 @@ export function TerminalPanel({ workspaceId, embedded = false }: TerminalPanelPr
     (async () => {
       try {
         const [outputUn, exitUn, notificationUn, notificationClearedUn] = await Promise.all([
-          listenTerminalOutput(workspaceId, (event) => {
+          getTerminalSessionGateway().listenTerminalOutput(workspaceId, (event) => {
             scheduleTerminalOutputDrain(workspaceId, event.sessionId, event.latestSeq);
           }),
-          listenTerminalExit(workspaceId, (event) => {
+          getTerminalSessionGateway().listenTerminalExit(workspaceId, (event) => {
             destroyCachedTerminal(workspaceId, event.sessionId);
             handleSessionExit(workspaceId, event.sessionId);
           }),
-          listenTerminalNotification(workspaceId, (event) => {
+          getTerminalSessionGateway().listenTerminalNotification(workspaceId, (event) => {
             if (shouldSuppressNotificationForSession(event.sessionId)) {
               void clearNotification(workspaceId, event.sessionId);
               return;
             }
             applyNotification(workspaceId, event);
           }),
-          listenTerminalNotificationCleared(workspaceId, (event) => {
+          getTerminalSessionGateway().listenTerminalNotificationCleared(workspaceId, (event) => {
             clearNotificationLocal(workspaceId, event.sessionId);
           }),
         ]);
@@ -3882,7 +3879,7 @@ export function TerminalPanel({ workspaceId, embedded = false }: TerminalPanelPr
     const harness = installedHarnesses.find((h) => h.id === harnessId);
     const sessionId = await createSession(workspaceId, cols, rows, harnessId, harness?.name);
     if (sessionId) {
-      void writeCommandToNewSession(workspaceId, sessionId, command);
+      void getTerminalSessionGateway().writeCommandToNewSession(workspaceId, sessionId, command);
     }
   }, [focusedSessionId, createSession, workspaceId, harnessLaunch, installedHarnesses]);
 
@@ -3939,7 +3936,7 @@ export function TerminalPanel({ workspaceId, embedded = false }: TerminalPanelPr
     await Promise.all(
       result.sessionIds.map((sessionId, i) => {
         const meta = harnessMeta[i];
-        if (meta) return writeCommandToNewSession(workspaceId, sessionId, meta.command);
+        if (meta) return getTerminalSessionGateway().writeCommandToNewSession(workspaceId, sessionId, meta.command);
       }),
     );
 

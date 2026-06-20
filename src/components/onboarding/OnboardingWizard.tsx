@@ -1,6 +1,4 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { open as openDirectoryDialog } from "@tauri-apps/plugin-dialog";
-import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -18,7 +16,9 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { copyTextToClipboard } from "../../lib/clipboard";
+import { copyTextToClipboard } from "../../contexts/shell-ui/application/clipboard";
+import { openExternalUrl } from "../../contexts/shell-ui/application/externalLinks";
+import { selectDirectoryPath } from "../../contexts/shell-ui/application/fileDialogs";
 import {
   canContinueChatReadiness,
   isOnboardingEnterTargetInteractive,
@@ -27,10 +27,13 @@ import {
   nextOnboardingStep,
   previousOnboardingStep,
   shouldAutoOpenOnboarding,
-} from "../../lib/onboarding";
-import { ipc } from "../../lib/ipc";
-import { getHarnessInstallCommand } from "../../lib/harnessInstallActions";
-import { getNodeManualGuidance } from "../../lib/setupGuidance";
+} from "../../contexts/onboarding/domain/onboardingFlow";
+import { getHarnessInstallCommand } from "../../contexts/harnesses/domain/harnessInstallActions";
+import { getNodeManualGuidance } from "../../contexts/onboarding/domain/setupGuidance";
+import {
+  checkOnboardingDependencies,
+  getOnboardingEngineHealth,
+} from "../../contexts/onboarding/application/onboardingReadiness";
 import { useEngineStore } from "../../stores/engineStore";
 import { useHarnessStore } from "../../stores/harnessStore";
 import { useOnboardingStore } from "../../stores/onboardingStore";
@@ -848,9 +851,9 @@ export function OnboardingWizard() {
     const requestId = ++readinessRequestRef.current;
     setReadiness((s) => ({ ...s, loading: true, error: null }));
     try {
-      const dependencyReport = await ipc.checkDependencies();
+      const dependencyReport = await checkOnboardingDependencies();
       const engineResults = await Promise.allSettled(
-        selectedChatEngines.map((id) => ipc.engineHealth(id)),
+        selectedChatEngines.map((id) => getOnboardingEngineHealth(id)),
       );
       const nextHealth: Partial<Record<OnboardingChatEngineId, EngineHealth>> = {};
       engineResults.forEach((result, i) => {
@@ -938,12 +941,12 @@ export function OnboardingWizard() {
   }
 
   async function handleOpenWebsite(url: string) {
-    try { await openExternal(url); } catch { /* best-effort */ }
+    try { await openExternalUrl(url); } catch { /* best-effort */ }
   }
 
   async function handleOpenWorkspaceFolder() {
-    const selected = await openDirectoryDialog({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) return;
+    const selected = await selectDirectoryPath();
+    if (!selected) return;
     const openedWorkspace = await openWorkspace(selected);
     if (!openedWorkspace) return;
     setSelectedWorkspaceId(openedWorkspace.id);

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApprovalResponse, StreamEvent } from "../types";
+import { configureChatGateway } from "../contexts/chat/application/chatGateway";
 
 const mockIpc = vi.hoisted(() => ({
+  cancelTurn: vi.fn(),
   sendMessage: vi.fn(),
   steerMessage: vi.fn(),
   getThreadMessagesWindow: vi.fn(),
@@ -38,6 +40,61 @@ function deferred<T>() {
 describe("chatStore send", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configureChatGateway({
+      cancelTurn: vi.fn((threadId: string) => mockIpc.cancelTurn(threadId)),
+      clearTimer: (timer) => globalThis.clearTimeout(timer),
+      compactNativeThread: vi.fn().mockResolvedValue([0, 0]),
+      confirmWorkspaceThread: vi.fn().mockResolvedValue(undefined),
+      createId: () => crypto.randomUUID(),
+      epochSecondsOrMillisecondsToIso: (value) => {
+        if (!Number.isFinite(value)) {
+          return null;
+        }
+        const normalized = value < 10_000_000_000 ? value * 1000 : value;
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+      },
+      getActionOutput: mockIpc.getActionOutput,
+      getContextMaxTokens: vi.fn().mockResolvedValue(0),
+      getNativeHistoryTokens: vi.fn().mockResolvedValue(0),
+      getOpenCodeRuntimeCatalog: vi.fn().mockResolvedValue({
+        agents: [],
+        commands: [],
+        mcpServers: [],
+      }),
+      getThreadMessagesWindow: mockIpc.getThreadMessagesWindow,
+      listenChatTurnFinished: vi.fn().mockResolvedValue(vi.fn()),
+      listenThreadEvents: mockListenThreadEvents,
+      listCodexApps: vi.fn().mockResolvedValue([]),
+      listCodexSkills: vi.fn().mockResolvedValue([]),
+      listCodexRemoteThreads: vi.fn().mockResolvedValue({ threads: [], nextCursor: null }),
+      listOpenCodeRemoteSessions: vi.fn().mockResolvedValue({ sessions: [], nextCursor: null }),
+      nowIso: () => new Date().toISOString(),
+      performanceNow: () => performance.now(),
+      prewarmEngine: vi.fn().mockResolvedValue(undefined),
+      readAttachmentPreview: vi.fn(),
+      recordMetric: mockRecordPerfMetric,
+      respondApproval: mockIpc.respondApproval,
+      scheduleAfterPaint: (callback) => {
+        if (typeof globalThis.requestAnimationFrame === "function") {
+          globalThis.requestAnimationFrame(callback);
+          return;
+        }
+        globalThis.setTimeout(() => callback(performance.now()), 0);
+      },
+      savePastedImageAttachment: vi.fn(),
+      searchMessages: vi.fn().mockResolvedValue([]),
+      sendMessage: mockIpc.sendMessage,
+      setThreadCodexConfig: vi.fn(),
+      setThreadExecutionPolicy: vi.fn(),
+      setThreadOpenCodeConfig: vi.fn(),
+      setThreadReasoningEffort: vi.fn().mockResolvedValue(undefined),
+      setTimer: (callback, delayMs) => globalThis.setTimeout(callback, delayMs),
+      startCodexReview: vi.fn(),
+      steerMessage: mockIpc.steerMessage,
+      syncThreadFromEngine: mockIpc.syncThreadFromEngine,
+      wallClockNow: () => Date.now(),
+    });
     mockIpc.getThreadMessagesWindow.mockResolvedValue({
       messages: [],
       nextCursor: null,

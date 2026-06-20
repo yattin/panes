@@ -7,13 +7,6 @@ import { PowerSettingsModal } from "./components/shared/PowerSettingsModal";
 import { TerminalNotificationSettingsModal } from "./components/shared/TerminalNotificationSettingsModal";
 import { t } from "./i18n";
 import { useUpdateStore } from "./stores/updateStore";
-import {
-  ipc,
-  listenChatTurnFinished,
-  listenEngineRuntimeUpdated,
-  listenMenuAction,
-  listenThreadUpdated,
-} from "./lib/ipc";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useEngineStore } from "./stores/engineStore";
 import { useUiStore } from "./stores/uiStore";
@@ -30,20 +23,83 @@ import { getActiveEditorView, openSearchPanel } from "./components/editor/CodeMi
 import { CustomWindowFrame } from "./components/shared/CustomWindowFrame";
 import { CueLightTokenGate } from "./components/cuelight/CueLightTokenGate";
 import { CreateWorkspaceDialog } from "./components/cuelight/CreateWorkspaceDialog";
-import { useCustomWindowFrameState } from "./lib/customWindowFrame";
-import { runEditMenuAction } from "./lib/nativeEditActions";
-import { createAndActivateWorkspaceThread } from "./lib/newThreadActions";
+import { useCustomWindowFrameState } from "./contexts/shell-ui/infrastructure/customWindowFrameState";
+import { runEditMenuAction } from "./contexts/shell-ui/application/nativeEditActions";
+import { configureChatGateway, getChatGateway } from "./contexts/chat/application/chatGateway";
+import { chatGateway } from "./contexts/chat/infrastructure/chatGatewayAdapter";
+import { configureCueLightGateway } from "./contexts/cue-light/application/cueLightGateway";
+import { cueLightRepository } from "./contexts/cue-light/infrastructure/cueLightRepository";
+import { configureEngineGateway } from "./contexts/engines/application/engineGateway";
+import {
+  engineRepository,
+  listenEngineRuntimeUpdated,
+} from "./contexts/engines/infrastructure/engineRepository";
+import { configureFileEditorGateway } from "./contexts/file-editor/application/fileEditorGateway";
+import { fileEditorGateway } from "./contexts/file-editor/infrastructure/fileRepository";
+import { configureFileNavigationGateway } from "./contexts/file-navigation/application/fileNavigationGateway";
+import { fileNavigationGateway } from "./contexts/file-navigation/infrastructure/fileNavigationRepository";
+import { configureGitGateway } from "./contexts/git/application/gitGateway";
+import { gitGateway } from "./contexts/git/infrastructure/gitRepository";
+import { configureHarnessGateway } from "./contexts/harnesses/application/harnessGateway";
+import { harnessRepository } from "./contexts/harnesses/infrastructure/harnessRepository";
+import { configureOnboardingGateway } from "./contexts/onboarding/application/onboardingGateway";
+import { hydrateOnboardingPreferences } from "./contexts/onboarding/application/onboardingStore";
+import { onboardingGateway } from "./contexts/onboarding/infrastructure/onboardingRepository";
+import { configurePowerManagementGateway } from "./contexts/power-management/application/powerManagementGateway";
+import { powerManagementRepository } from "./contexts/power-management/infrastructure/powerManagementRepository";
+import {
+  configureShellUiGateway,
+} from "./contexts/shell-ui/application/shellUiGateway";
+import { hydrateShellUiPreferences } from "./contexts/shell-ui/application/uiStore";
+import { shellNativeRepository } from "./contexts/shell-ui/infrastructure/shellNativeRepository";
+import { shellUiGateway } from "./contexts/shell-ui/infrastructure/shellUiGateway";
+import { configureUpdateGateway } from "./contexts/software-update/application/updateGateway";
+import { tauriUpdateClient } from "./contexts/software-update/infrastructure/tauriUpdateClient";
+import { configureTerminalNotificationSettingsGateway } from "./contexts/terminal-sessions/application/terminalNotificationSettingsGateway";
+import { configureTerminalSessionGateway } from "./contexts/terminal-sessions/application/terminalSessionGateway";
+import { terminalNotificationSettingsRepository } from "./contexts/terminal-sessions/infrastructure/terminalNotificationSettingsRepository";
+import { terminalSessionGateway } from "./contexts/terminal-sessions/infrastructure/terminalRepository";
+import { configureThreadGateway } from "./contexts/threads/application/threadGateway";
+import { createAndActivateWorkspaceThread } from "./contexts/threads/application/newThreadActions";
+import {
+  threadGateway,
+  threadRepository,
+} from "./contexts/threads/infrastructure/threadRepository";
 import {
   cycleWorkspaceTerminalLayout,
   isWorkspaceSurfaceVisible,
   toggleWorkspaceEditorLayout,
-} from "./lib/workspacePaneNavigation";
+} from "./contexts/workspace-panes/application/workspacePaneNavigation";
+import { configureWorkspacePaneGateway } from "./contexts/workspace-panes/application/workspacePaneGateway";
+import { workspacePaneGateway } from "./contexts/workspace-panes/infrastructure/workspacePaneLayoutStorage";
+import { configureWorkspaceGateway } from "./contexts/workspaces/application/workspaceGateway";
+import { workspaceGateway } from "./contexts/workspaces/infrastructure/workspaceRepository";
 import {
   usesCustomWindowFrame,
   isTerminalInputFocused,
   requestWindowClose,
-  shouldHandleAppShortcutWhileTerminalFocused, toggleWindowFullscreen,
-} from "./lib/windowActions";
+  toggleWindowFullscreen,
+} from "./contexts/shell-ui/application/windowActions";
+import { shouldHandleAppShortcutWhileTerminalFocused } from "./contexts/shell-ui/domain/appShortcuts";
+
+configureCueLightGateway(cueLightRepository);
+configureChatGateway(chatGateway);
+configureEngineGateway(engineRepository);
+configureFileEditorGateway(fileEditorGateway);
+configureFileNavigationGateway(fileNavigationGateway);
+configureGitGateway(gitGateway);
+configureHarnessGateway(harnessRepository);
+configureOnboardingGateway(onboardingGateway);
+hydrateOnboardingPreferences();
+configurePowerManagementGateway(powerManagementRepository);
+configureShellUiGateway(shellUiGateway);
+hydrateShellUiPreferences();
+configureTerminalNotificationSettingsGateway(terminalNotificationSettingsRepository);
+configureTerminalSessionGateway(terminalSessionGateway);
+configureThreadGateway(threadGateway);
+configureUpdateGateway(tauriUpdateClient);
+configureWorkspaceGateway(workspaceGateway);
+configureWorkspacePaneGateway(workspacePaneGateway);
 
 // Debounce guard: when both the JS keydown handler and the native menu-action
 // fire for the same shortcut, only the first one within 100ms takes effect.
@@ -166,13 +222,13 @@ export function App() {
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    void listenThreadUpdated(async ({ workspaceId, thread }) => {
+    void threadRepository.listenThreadUpdated(async ({ workspaceId, thread }) => {
       if (thread) {
         const applied = applyThreadUpdateLocal(thread);
         const activeThreadId = useThreadStore.getState().activeThreadId;
         if (thread.id === activeThreadId && isCodexSyncRequired(thread)) {
           try {
-            const syncedThread = await ipc.syncThreadFromEngine(thread.id);
+            const syncedThread = await getChatGateway().syncThreadFromEngine(thread.id);
             if (useThreadStore.getState().applyThreadUpdateLocal(syncedThread)) {
               return;
             }
@@ -208,7 +264,7 @@ export function App() {
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    void listenChatTurnFinished(async (event) => {
+    void getChatGateway().listenChatTurnFinished(async (event) => {
       const notificationStore = useTerminalNotificationSettingsStore.getState();
       const settings = notificationStore.settings ?? await notificationStore.load();
       if (!settings?.chatEnabled || event.status === "interrupted") {
@@ -229,7 +285,7 @@ export function App() {
       const body = resolveChatNotificationBody(event.status, event.preview);
 
       try {
-        await ipc.showAgentNotification(title, body);
+        await shellNativeRepository.showAgentNotification(title, body);
       } catch (error) {
         console.warn(`Failed to show chat notification for thread ${event.threadId}:`, error);
       }
@@ -500,7 +556,7 @@ export function App() {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    void listenMenuAction((action) => {
+    void shellNativeRepository.listenMenuAction((action) => {
       switch (action) {
         case "toggle-sidebar":
           fireShortcut("toggle-sidebar", () => useUiStore.getState().toggleSidebar());

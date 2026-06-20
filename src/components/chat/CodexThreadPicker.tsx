@@ -10,7 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ipc } from "../../lib/ipc";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 import type { CodexRemoteThread } from "../../types";
 
 interface CodexThreadPickerProps {
@@ -138,7 +138,7 @@ export function CodexThreadPicker({
     }
 
     try {
-      const page = await ipc.listCodexRemoteThreads(workspaceId, {
+      const page = await getChatGateway().listCodexRemoteThreads(workspaceId, {
         cursor,
         limit: 20,
         searchTerm: searchQuery || null,

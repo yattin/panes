@@ -1,4 +1,4 @@
-import type { ComposerRuntimeSnapshot } from "../../lib/newThreadRuntime";
+import type { ComposerRuntimeSnapshot } from "../../contexts/threads/domain/newThreadRuntime";
 import type { EngineModel } from "../../types";
 import { resolveReasoningEffortForModel } from "./reasoningEffort";
 

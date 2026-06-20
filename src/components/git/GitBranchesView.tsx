@@ -2,8 +2,8 @@ import { useContext, useEffect, useState, useRef, useCallback, useLayoutEffect }
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Plus, X, MoreHorizontal, GitBranch, GitBranchPlus, Pencil, Trash2, Loader2, Search } from "lucide-react";
-import { formatDateTime } from "../../lib/formatters";
-import { closeGitFlyoutIfFocusLeft, GitFlyoutContext } from "../../lib/gitFlyoutRegion";
+import { formatDateTime } from "../../contexts/shell-ui/application/formatters";
+import { closeGitFlyoutIfFocusLeft, GitFlyoutContext } from "../../contexts/git/application/gitFlyoutRegion";
 import { getActionMenuPosition } from "./actionMenuPosition";
 import { toast } from "../../stores/toastStore";
 import { useGitStore } from "../../stores/gitStore";

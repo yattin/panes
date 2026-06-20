@@ -1,17 +1,9 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { MouseEvent } from "react";
+import {
+  handleResizeMouseDown,
+  type WindowResizeDirection,
+} from "../../contexts/shell-ui/application/windowDrag";
 
-type ResizeDirection =
-  | "East"
-  | "North"
-  | "NorthEast"
-  | "NorthWest"
-  | "South"
-  | "SouthEast"
-  | "SouthWest"
-  | "West";
-
-const HANDLE_DIRECTIONS: Array<{ className: string; direction: ResizeDirection }> = [
+const HANDLE_DIRECTIONS: Array<{ className: string; direction: WindowResizeDirection }> = [
   { className: "linux-window-resize-handle-north", direction: "North" },
   { className: "linux-window-resize-handle-south", direction: "South" },
   { className: "linux-window-resize-handle-east", direction: "East" },
@@ -21,16 +13,6 @@ const HANDLE_DIRECTIONS: Array<{ className: string; direction: ResizeDirection }
   { className: "linux-window-resize-handle-south-west", direction: "SouthWest" },
   { className: "linux-window-resize-handle-south-east", direction: "SouthEast" },
 ];
-
-function handleResizeMouseDown(direction: ResizeDirection, event: MouseEvent<HTMLDivElement>) {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  getCurrentWindow().startResizeDragging(direction).catch((error) => {
-    if (import.meta.env.DEV) {
-      console.warn(`[CustomWindowResizeHandles] Failed to start resize dragging (${direction})`, error);
-    }
-  });
-}
 
 interface CustomWindowResizeHandlesProps {
   canResize: boolean;

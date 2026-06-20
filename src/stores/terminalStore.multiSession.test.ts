@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Repo, TerminalNotification, TerminalSession, Workspace } from "../types";
+import type { Repo, SplitNode, TerminalGroup, TerminalNotification, TerminalSession, Workspace } from "../types";
 
 const mockIpc = vi.hoisted(() => ({
   terminalCreateSession: vi.fn(),
   terminalCloseSession: vi.fn(),
   terminalCloseWorkspaceSessions: vi.fn(),
+  terminalDrainOutput: vi.fn(),
+  terminalGetRendererDiagnostics: vi.fn(),
+  terminalListSessions: vi.fn(),
+  terminalResize: vi.fn(),
+  terminalResumeSession: vi.fn(),
+  terminalWrite: vi.fn(),
+  terminalWriteBytes: vi.fn(),
   terminalListNotifications: vi.fn(),
   terminalClearNotification: vi.fn(),
   terminalSetNotificationFocus: vi.fn(),
@@ -13,6 +20,8 @@ const mockIpc = vi.hoisted(() => ({
   getRepos: vi.fn(),
   launchHarness: vi.fn(),
   getWorkspaceStartupPreset: vi.fn(),
+  getTerminalAcceleratedRendering: vi.fn(),
+  setTerminalAcceleratedRendering: vi.fn(),
 }));
 const mockWriteCommandToNewSession = vi.hoisted(() => vi.fn());
 
@@ -31,6 +40,8 @@ vi.mock("../lib/ipc", () => ({
 import { useTerminalStore } from "./terminalStore";
 import { useHarnessStore } from "./harnessStore";
 import { useWorkspaceStore } from "./workspaceStore";
+import { configureTerminalSessionGateway } from "../contexts/terminal-sessions/application/terminalSessionGateway";
+import { configureWorkspaceGateway } from "../contexts/workspaces/application/workspaceGateway";
 
 function makeSession(id: string): TerminalSession {
   return {
@@ -77,6 +88,16 @@ function makeRepo(id: string, workspaceId: string, path: string): Repo {
   };
 }
 
+function makeGroup(id: string, name: string, sessionId: string): TerminalGroup {
+  return {
+    id,
+    name,
+    root: { type: "leaf", sessionId },
+    sessionMeta: {},
+    worktreeConfig: null,
+  };
+}
+
 async function flushPromises() {
   await Promise.resolve();
   await Promise.resolve();
@@ -90,6 +111,83 @@ describe("terminalStore.createMultiSessionGroup", () => {
     mockLocalStorage.removeItem.mockImplementation(() => undefined);
     mockLocalStorage.clear.mockImplementation(() => undefined);
     vi.stubGlobal("localStorage", mockLocalStorage);
+    configureTerminalSessionGateway({
+      addGitWorktree: mockIpc.addGitWorktree,
+      createTerminalGroupId: () => crypto.randomUUID(),
+      createTerminalSplitId: () => crypto.randomUUID(),
+      createTerminalWorktreeRunId: () => crypto.randomUUID().slice(0, 8),
+      getTerminalAcceleratedRendering: mockIpc.getTerminalAcceleratedRendering,
+      getRepos: mockIpc.getRepos,
+      getWorkspaceStartupPreset: mockIpc.getWorkspaceStartupPreset,
+      launchHarness: mockIpc.launchHarness,
+      readStoredLayoutMode: (workspaceId) => {
+        try {
+          const value = mockLocalStorage.getItem(`panes:layoutMode:${workspaceId}`);
+          return value === "terminal" || value === "split" || value === "editor"
+            ? value
+            : "chat";
+        } catch {
+          return "chat";
+        }
+      },
+      removeGitWorktree: mockIpc.removeGitWorktree,
+      setTerminalAcceleratedRendering: mockIpc.setTerminalAcceleratedRendering,
+      terminalClearNotification: mockIpc.terminalClearNotification,
+      terminalCloseSession: mockIpc.terminalCloseSession,
+      terminalCloseWorkspaceSessions: mockIpc.terminalCloseWorkspaceSessions,
+      terminalCreateSession: mockIpc.terminalCreateSession,
+      terminalDrainOutput: mockIpc.terminalDrainOutput,
+      terminalGetRendererDiagnostics: mockIpc.terminalGetRendererDiagnostics,
+      terminalListNotifications: mockIpc.terminalListNotifications,
+      terminalListSessions: mockIpc.terminalListSessions,
+      terminalResize: mockIpc.terminalResize,
+      terminalResumeSession: mockIpc.terminalResumeSession,
+      terminalSetNotificationFocus: mockIpc.terminalSetNotificationFocus,
+      terminalWrite: mockIpc.terminalWrite,
+      terminalWriteBytes: mockIpc.terminalWriteBytes,
+      listenTerminalExit: vi.fn(),
+      listenTerminalForegroundChanged: vi.fn(),
+      listenTerminalNotification: vi.fn(),
+      listenTerminalNotificationCleared: vi.fn(),
+      listenTerminalOutput: vi.fn(),
+      writeCommandToNewSession: mockWriteCommandToNewSession,
+      writeStoredLayoutMode: (workspaceId, mode) => {
+        mockLocalStorage.setItem(`panes:layoutMode:${workspaceId}`, mode);
+      },
+    });
+    configureWorkspaceGateway({
+      archiveWorkspace: vi.fn(),
+      bindCueLightProject: vi.fn(),
+      clearWorkspaceStartupPreset: vi.fn(),
+      getCueLightBinding: vi.fn(),
+      getRepos: mockIpc.getRepos,
+      getWorkspaceStartupPreset: mockIpc.getWorkspaceStartupPreset,
+      hasWorkspaceGitSelection: vi.fn(),
+      listArchivedWorkspaces: vi.fn(),
+      listWorkspaces: vi.fn(),
+      normalizeWorkspaceStartupPreset: vi.fn(),
+      normalizeWorkspaceStartupPresetRaw: vi.fn(),
+      openWorkspace: vi.fn(),
+      readLastRepoByWorkspace: () => {
+        const raw = mockLocalStorage.getItem("panes:lastActiveRepoByWorkspace");
+        if (!raw) {
+          return {};
+        }
+        return JSON.parse(raw) as Record<string, string>;
+      },
+      readLastWorkspaceId: () => mockLocalStorage.getItem("panes:lastActiveWorkspaceId"),
+      rememberLastRepo: vi.fn(),
+      revealWorkspacePath: vi.fn(),
+      restoreWorkspace: vi.fn(),
+      serializeWorkspaceStartupPreset: vi.fn(),
+      setRepoGitActive: vi.fn(),
+      setRepoTrustLevel: vi.fn(),
+      setWorkspaceStartupPreset: vi.fn(),
+      setWorkspaceStartupPresetRaw: vi.fn(),
+      setWorkspaceGitActiveRepos: vi.fn(),
+      unbindCueLightProject: vi.fn(),
+      writeLastWorkspaceId: vi.fn(),
+    });
     useTerminalStore.setState({ workspaces: {} });
     useHarnessStore.setState({
       phase: "idle",
@@ -110,6 +208,8 @@ describe("terminalStore.createMultiSessionGroup", () => {
     });
     mockIpc.terminalCloseSession.mockResolvedValue(undefined);
     mockIpc.terminalCloseWorkspaceSessions.mockResolvedValue(undefined);
+    mockIpc.terminalListSessions.mockResolvedValue([]);
+    mockIpc.terminalWrite.mockResolvedValue(undefined);
     mockIpc.terminalListNotifications.mockResolvedValue([]);
     mockIpc.terminalClearNotification.mockResolvedValue(undefined);
     mockIpc.terminalSetNotificationFocus.mockResolvedValue(undefined);
@@ -275,6 +375,119 @@ describe("terminalStore.createMultiSessionGroup", () => {
     await flushPromises();
 
     expect(mockIpc.removeGitWorktree).not.toHaveBeenCalled();
+  });
+
+  it("ignores invalid group reorder requests", () => {
+    const groups = [
+      makeGroup("g1", "Terminal 1", "s1"),
+      makeGroup("g2", "Terminal 2", "s2"),
+    ];
+
+    useTerminalStore.setState({
+      workspaces: {
+        "ws-1": {
+          isOpen: true,
+          layoutMode: "split",
+          preEditorLayoutMode: "chat",
+          panelSize: 32,
+          sessions: [makeSession("s1"), makeSession("s2")],
+          notificationsBySessionId: {},
+          activeSessionId: "s1",
+          groups,
+          activeGroupId: "g1",
+          focusedSessionId: "s1",
+          broadcastGroupId: null,
+          startupPreset: null,
+          pendingStartupPreset: null,
+          loading: false,
+          error: undefined,
+        },
+      },
+    });
+
+    useTerminalStore.getState().reorderGroups("ws-1", 99, 0);
+
+    expect(useTerminalStore.getState().workspaces["ws-1"]?.groups).toEqual(groups);
+  });
+
+  it("keeps the previous terminal panel size when the next size is not finite", () => {
+    useTerminalStore.setState({
+      workspaces: {
+        "ws-1": {
+          isOpen: true,
+          layoutMode: "split",
+          preEditorLayoutMode: "chat",
+          panelSize: 44,
+          sessions: [],
+          notificationsBySessionId: {},
+          activeSessionId: null,
+          groups: [],
+          activeGroupId: null,
+          focusedSessionId: null,
+          broadcastGroupId: null,
+          startupPreset: null,
+          pendingStartupPreset: null,
+          loading: false,
+          error: undefined,
+        },
+      },
+    });
+
+    useTerminalStore.getState().setPanelSize("ws-1", Number.NaN);
+
+    expect(useTerminalStore.getState().workspaces["ws-1"]?.panelSize).toBe(44);
+  });
+
+  it("keeps the previous split ratio when the next ratio is not finite", () => {
+    const root: SplitNode = {
+      type: "split" as const,
+      id: "split-1",
+      direction: "vertical" as const,
+      ratio: 0.4,
+      children: [
+        { type: "leaf" as const, sessionId: "s1" },
+        { type: "leaf" as const, sessionId: "s2" },
+      ],
+    };
+
+    useTerminalStore.setState({
+      workspaces: {
+        "ws-1": {
+          isOpen: true,
+          layoutMode: "split",
+          preEditorLayoutMode: "chat",
+          panelSize: 32,
+          sessions: [makeSession("s1"), makeSession("s2")],
+          notificationsBySessionId: {},
+          activeSessionId: "s1",
+          groups: [
+            {
+              id: "g1",
+              name: "Terminal 1",
+              root,
+              sessionMeta: {},
+              worktreeConfig: null,
+            },
+          ],
+          activeGroupId: "g1",
+          focusedSessionId: "s1",
+          broadcastGroupId: null,
+          startupPreset: null,
+          pendingStartupPreset: null,
+          loading: false,
+          error: undefined,
+        },
+      },
+    });
+
+    useTerminalStore.getState().updateGroupRatio("ws-1", "g1", "split-1", Number.NaN);
+
+    const nextRoot = useTerminalStore.getState().workspaces["ws-1"]?.groups[0]?.root;
+    expect(nextRoot).toMatchObject({
+      type: "split",
+      id: "split-1",
+      ratio: 0.4,
+    });
   });
 
   it("reports rollback cleanup failures when group creation fails", async () => {
@@ -529,6 +742,23 @@ describe("terminalStore.createMultiSessionGroup", () => {
     expect(workspace?.panelSize).toBe(33);
     expect(workspace?.isOpen).toBe(true);
     expect(workspace?.pendingStartupPreset).toBeNull();
+  });
+
+  it("falls back to chat layout when stored layout preferences cannot be read", async () => {
+    mockLocalStorage.getItem.mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    mockIpc.getWorkspaceStartupPreset.mockResolvedValue(null);
+
+    await expect(
+      useTerminalStore.getState().prepareWorkspaceActivation("ws-1"),
+    ).resolves.toBeUndefined();
+
+    const workspace = useTerminalStore.getState().workspaces["ws-1"];
+    expect(workspace?.layoutMode).toBe("chat");
+    expect(workspace?.isOpen).toBe(false);
+    expect(workspace?.loading).toBe(false);
+    expect(workspace?.error).toBeUndefined();
   });
 
   it("re-arms the saved startup preset after closing the terminal", async () => {

@@ -4,7 +4,7 @@ import {
   extractDiffFilename,
   parseDiff,
   type ParsedLine,
-} from "../lib/parseDiff";
+} from "../contexts/git/domain/parseDiff";
 import type {
   DiffParseWorkerRequest,
   DiffParseWorkerResponse,

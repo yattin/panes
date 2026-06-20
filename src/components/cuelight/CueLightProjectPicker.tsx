@@ -1,15 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { ipc } from "../../lib/ipc";
-import { CUELIGHT_SERVER_URL, getCueLightToken } from "../../lib/cueLightConfig";
+import {
+  getCueLightGateway,
+  type CueLightProjectOption,
+} from "../../contexts/cue-light/application/cueLightGateway";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useCueLightStore } from "../../stores/cueLightStore";
-
-interface ProjectOption {
-  id: string;
-  name: string;
-  projectType?: string;
-}
 
 interface CueLightProjectPickerProps {
   workspaceId?: string;
@@ -25,7 +21,7 @@ export function CueLightProjectPicker({ workspaceId, onProjectSelected }: CueLig
   const unbindCueLight = useWorkspaceStore((s) => s.unbindCueLight);
   const resetCueLightStore = useCueLightStore((s) => s.reset);
 
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projects, setProjects] = useState<CueLightProjectOption[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     binding?.projectId ?? null,
@@ -41,29 +37,10 @@ export function CueLightProjectPicker({ workspaceId, onProjectSelected }: CueLig
   }, []);
 
   const fetchProjects = useCallback(async () => {
-    const token = getCueLightToken();
-    if (!token) {
-      setError("请先配置 API Token");
-      return;
-    }
-
     setLoadingProjects(true);
     setError(null);
     try {
-      const result = await ipc.cueLightProxy({
-        method: "GET",
-        serverUrl: CUELIGHT_SERVER_URL,
-        path: "/api/projects",
-        authToken: token,
-      });
-      const list = Array.isArray(result) ? result : (result as any)?.items ?? (result as any)?.data ?? [];
-      setProjects(
-        list.map((p: any) => ({
-          id: p.id,
-          name: p.title ?? p.name ?? "Untitled",
-          projectType: p.projectType,
-        })),
-      );
+      setProjects(await getCueLightGateway().listProjects());
     } catch (e) {
       setError(String(e));
       setProjects([]);

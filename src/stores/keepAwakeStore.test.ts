@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockIpc = vi.hoisted(() => ({
+  getHelperStatus: vi.fn(),
   getKeepAwakeState: vi.fn(),
   setKeepAwakeEnabled: vi.fn(),
   getPowerSettings: vi.fn(),
+  registerKeepAwakeHelper: vi.fn(),
   setPowerSettings: vi.fn(),
 }));
 
@@ -14,18 +16,15 @@ const mockToast = vi.hoisted(() => ({
   info: vi.fn(),
 }));
 
-vi.mock("../lib/ipc", () => ({
-  ipc: mockIpc,
-}));
-
 vi.mock("../i18n", () => ({
   t: (key: string) => key,
 }));
 
-vi.mock("./toastStore", () => ({
+vi.mock("../contexts/shell-ui/application/toastStore", () => ({
   toast: mockToast,
 }));
 
+import { configurePowerManagementGateway } from "../contexts/power-management/application/powerManagementGateway";
 import { canToggleKeepAwake, useKeepAwakeStore } from "./keepAwakeStore";
 
 function createStorageStub() {
@@ -56,6 +55,7 @@ function createDeferred<T>() {
 describe("keepAwakeStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configurePowerManagementGateway(mockIpc);
     vi.stubGlobal("localStorage", createStorageStub());
     useKeepAwakeStore.setState({
       state: null,

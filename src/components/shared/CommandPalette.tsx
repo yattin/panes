@@ -37,7 +37,9 @@ import {
   RotateCcw,
   Minimize2,
 } from "lucide-react";
-import { ipc, writeCommandToNewSession } from "../../lib/ipc";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
+import { getFileEditorGateway } from "../../contexts/file-editor/application/fileEditorGateway";
+import { getGitGateway } from "../../contexts/git/application/gitGateway";
 import {
   COMMAND_PALETTE_DEFAULT_LAUNCH,
   detectCommandPaletteMode,
@@ -45,22 +47,23 @@ import {
   getNextCommandPaletteSearchScope,
   normalizeCommandPaletteInput,
   shouldTabCycleCommandPaletteSearchScope,
-  type CommandPaletteSearchScope,
-} from "../../lib/commandPalette";
+} from "../../contexts/shell-ui/domain/commandPalette";
+import type { CommandPaletteSearchScope } from "../../contexts/shell-ui/domain/uiState";
 import {
   getActiveGitRepos,
   hasMultipleActiveGitRepos,
   isRepoScopedGitCommandAvailable,
   resolveCommandPaletteGitStatus,
   shouldPersistPickedRepoSelection,
-} from "../../lib/commandPaletteGit";
-import { formatRelativeTime } from "../../lib/formatters";
-import { createAndActivateWorkspaceThread } from "../../lib/newThreadActions";
+} from "../../contexts/shell-ui/domain/commandPaletteGit";
+import { formatRelativeTime } from "../../contexts/shell-ui/application/formatters";
+import { getTerminalSessionGateway } from "../../contexts/terminal-sessions/application/terminalSessionGateway";
+import { createAndActivateWorkspaceThread } from "../../contexts/threads/application/newThreadActions";
 import {
   applyWorkspaceLayoutMode,
   showWorkspaceEditorForDirectFileOpen,
   showWorkspaceSurface,
-} from "../../lib/workspacePaneNavigation";
+} from "../../contexts/workspace-panes/application/workspacePaneNavigation";
 import { useUiStore } from "../../stores/uiStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useThreadStore } from "../../stores/threadStore";
@@ -452,7 +455,7 @@ export function getStaticCommands(
         repoPath: activeRepoPath,
         activeRepoPath: useGitStore.getState().activeRepoPath,
         activeStatus: useGitStore.getState().status,
-        loadStatus: ipc.getGitStatus,
+        loadStatus: getGitGateway().getGitStatus,
       });
       const unstaged = status?.files.filter((f) => f.worktreeStatus) ?? [];
       if (unstaged.length === 0) {
@@ -481,7 +484,7 @@ export function getStaticCommands(
         repoPath: activeRepoPath,
         activeRepoPath: useGitStore.getState().activeRepoPath,
         activeStatus: useGitStore.getState().status,
-        loadStatus: ipc.getGitStatus,
+        loadStatus: getGitGateway().getGitStatus,
       });
       const staged = status?.files.filter((f) => f.indexStatus) ?? [];
       if (staged.length === 0) {
@@ -786,7 +789,11 @@ export function getStaticCommands(
       const { activeThreadId } = useThreadStore.getState();
       if (!activeThreadId) return;
       try {
-        await ipc.startCodexReview(activeThreadId, { type: "uncommittedChanges" }, "inline");
+        await getChatGateway().startCodexReview(
+          activeThreadId,
+          { type: "uncommittedChanges" },
+          "inline",
+        );
         toast.success(t("commandPalette.toasts.codexReviewStarted"));
       } catch (err) {
         toast.error(String(err));
@@ -1131,7 +1138,7 @@ export function CommandPalette({ open, onClose }: Props) {
         repoPath,
         activeRepoPath: gitStoreActiveRepoPath,
         activeStatus: gitStatus,
-        loadStatus: ipc.getGitStatus,
+        loadStatus: getGitGateway().getGitStatus,
       }),
     [gitStatus, gitStoreActiveRepoPath],
   );
@@ -1209,7 +1216,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
     const timer = window.setTimeout(async () => {
       try {
-        const result = await ipc.searchWorkspaceFiles(
+        const result = await getFileEditorGateway().searchWorkspaceFiles(
           activeWorkspaceId,
           trimmedTerm,
           0,
@@ -1256,7 +1263,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
     const timer = window.setTimeout(async () => {
       try {
-        const found = await ipc.searchMessages(activeWorkspaceId, trimmedTerm);
+        const found = await getChatGateway().searchMessages(activeWorkspaceId, trimmedTerm);
         if (cancelled) {
           return;
         }
@@ -1289,8 +1296,8 @@ export function CommandPalette({ open, onClose }: Props) {
     const timer = window.setTimeout(async () => {
       try {
         const [localPage, remotePage] = await Promise.all([
-          ipc.listGitBranches(effectiveRepoPath, "local", 0, 50, searchQuery),
-          ipc.listGitBranches(effectiveRepoPath, "remote", 0, 50, searchQuery),
+          getGitGateway().listGitBranches(effectiveRepoPath, "local", 0, 50, searchQuery),
+          getGitGateway().listGitBranches(effectiveRepoPath, "remote", 0, 50, searchQuery),
         ]);
         if (cancelled) return;
         const localNames = new Set(localPage.entries.map((b) => b.name));
@@ -1329,8 +1336,8 @@ export function CommandPalette({ open, onClose }: Props) {
     const timer = window.setTimeout(async () => {
       try {
         const [localPage, remotePage] = await Promise.all([
-          ipc.listGitBranches(effectiveRepoPath, "local", 0, 50, searchQuery),
-          ipc.listGitBranches(effectiveRepoPath, "remote", 0, 50, searchQuery),
+          getGitGateway().listGitBranches(effectiveRepoPath, "local", 0, 50, searchQuery),
+          getGitGateway().listGitBranches(effectiveRepoPath, "remote", 0, 50, searchQuery),
         ]);
         if (cancelled) return;
         const localNames = new Set(localPage.entries.map((b) => b.name));
@@ -1371,7 +1378,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
     (async () => {
       try {
-        const stashes = await ipc.listGitStashes(effectiveRepoPath);
+        const stashes = await getGitGateway().listGitStashes(effectiveRepoPath);
         if (cancelled) return;
         setSubFlow((prev) =>
           prev?.type === flowType
@@ -1889,7 +1896,7 @@ export function CommandPalette({ open, onClose }: Props) {
       showWorkspaceSurface(activeWorkspaceId, "terminal");
       const sessionId = await useTerminalStore.getState().createSession(activeWorkspaceId);
       if (sessionId) {
-        void writeCommandToNewSession(activeWorkspaceId, sessionId, command);
+        void getTerminalSessionGateway().writeCommandToNewSession(activeWorkspaceId, sessionId, command);
       }
       useUiStore.getState().setActiveView("chat");
     },

@@ -2,7 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitFileCompare, ReadFileResult } from "../types";
 
 const mockIpc = vi.hoisted(() => ({
+  createDir: vi.fn(),
+  createEditorRevealNonce: vi.fn(),
+  createEditorTabId: vi.fn(),
+  createFile: vi.fn(),
+  deletePath: vi.fn(),
+  destroyEditorRuntimeCache: vi.fn(),
+  listDir: vi.fn(),
+  openPathWithDefaultApp: vi.fn(),
   readFile: vi.fn(),
+  renamePath: vi.fn(),
+  revealPath: vi.fn(),
+  searchWorkspaceFiles: vi.fn(),
   writeFile: vi.fn(),
   getGitFileCompare: vi.fn(),
 }));
@@ -13,7 +24,6 @@ const mockGitStore = vi.hoisted(() => ({
 }));
 
 const mockSetLayoutMode = vi.hoisted(() => vi.fn());
-const mockDestroyCachedEditor = vi.hoisted(() => vi.fn());
 const mockWorkspaceState = vi.hoisted(() => ({
   activeWorkspaceId: "ws-1",
   activeRepoId: "repo-1",
@@ -35,23 +45,19 @@ const mockToast = vi.hoisted(() => ({
   warning: vi.fn(),
 }));
 
-vi.mock("../lib/ipc", () => ({
-  ipc: mockIpc,
-}));
-
-vi.mock("./gitStore", () => ({
+vi.mock("../contexts/git/application/gitStore", () => ({
   useGitStore: {
     getState: () => mockGitStore,
   },
 }));
 
-vi.mock("./workspaceStore", () => ({
+vi.mock("../contexts/workspaces/application/workspaceStore", () => ({
   useWorkspaceStore: {
     getState: () => mockWorkspaceState,
   },
 }));
 
-vi.mock("./terminalStore", () => ({
+vi.mock("../contexts/terminal-sessions/application/terminalStore", () => ({
   useTerminalStore: {
     getState: () => ({
       workspaces: {
@@ -65,7 +71,7 @@ vi.mock("./terminalStore", () => ({
   },
 }));
 
-vi.mock("./toastStore", () => ({
+vi.mock("../contexts/shell-ui/application/toastStore", () => ({
   toast: mockToast,
 }));
 
@@ -73,10 +79,7 @@ vi.mock("../i18n", () => ({
   t: (key: string) => key,
 }));
 
-vi.mock("../components/editor/CodeMirrorEditor", () => ({
-  destroyCachedEditor: mockDestroyCachedEditor,
-}));
-
+import { configureFileEditorGateway } from "../contexts/file-editor/application/fileEditorGateway";
 import { useFileStore } from "./fileStore";
 
 function makeReadFileResult(content: string): ReadFileResult {
@@ -109,6 +112,10 @@ function makeCompare(
 describe("fileStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    let idCounter = 0;
+    mockIpc.createEditorTabId.mockImplementation(() => `tab-${++idCounter}`);
+    mockIpc.createEditorRevealNonce.mockImplementation(() => `reveal-${++idCounter}`);
+    configureFileEditorGateway(mockIpc);
     mockWorkspaceState.activeWorkspaceId = "ws-1";
     mockWorkspaceState.activeRepoId = "repo-1";
     mockWorkspaceState.repos = [
@@ -181,7 +188,7 @@ describe("fileStore", () => {
     expect(tab.savedContent).toBe("plain\n");
     expect(tab.isDirty).toBe(true);
     expect(tab.gitContext?.modifiedContent).toBe("on-disk\n");
-    expect(mockDestroyCachedEditor).toHaveBeenCalledWith(tabId);
+    expect(mockIpc.destroyEditorRuntimeCache).toHaveBeenCalledWith(tabId);
   });
 
   it("opens a plain editor tab with a pending reveal request", async () => {
@@ -245,14 +252,14 @@ describe("fileStore", () => {
       .openGitDiffFile("/repo", "src/app.ts", { source: "changes" });
 
     const tabId = useFileStore.getState().tabs[0]!.id;
-    mockDestroyCachedEditor.mockClear();
+    mockIpc.destroyEditorRuntimeCache.mockClear();
 
     await useFileStore
       .getState()
       .openFileAtLocation("/repo", "src/app.ts", { line: 8 });
 
-    expect(mockDestroyCachedEditor).toHaveBeenCalledWith(`${tabId}:git-base`);
-    expect(mockDestroyCachedEditor).toHaveBeenCalledWith(`${tabId}:git-modified`);
+    expect(mockIpc.destroyEditorRuntimeCache).toHaveBeenCalledWith(`${tabId}:git-base`);
+    expect(mockIpc.destroyEditorRuntimeCache).toHaveBeenCalledWith(`${tabId}:git-modified`);
     expect(useFileStore.getState().tabs[0]?.renderMode).toBe("plain-editor");
     expect(useFileStore.getState().tabs[0]?.pendingReveal).toMatchObject({
       line: 8,
@@ -410,6 +417,25 @@ describe("fileStore", () => {
 
     const tab = useFileStore.getState().tabs[0]!;
     expect(tab.renderMode).toBe("markdown-preview");
+    expect(tab.gitContext).toBeNull();
+    expect(tab.pendingReveal).toBeNull();
+  });
+
+  it("keeps binary tabs in plain editor mode when markdown preview is requested", async () => {
+    mockIpc.readFile.mockResolvedValueOnce({
+      content: "",
+      sizeBytes: 16,
+      isBinary: true,
+    });
+
+    await useFileStore.getState().openFile("/repo", "README.md");
+
+    const tabId = useFileStore.getState().tabs[0]!.id;
+    useFileStore.getState().setTabRenderMode(tabId, "markdown-preview");
+
+    const tab = useFileStore.getState().tabs[0]!;
+    expect(tab.isBinary).toBe(true);
+    expect(tab.renderMode).toBe("plain-editor");
     expect(tab.gitContext).toBeNull();
     expect(tab.pendingReveal).toBeNull();
   });

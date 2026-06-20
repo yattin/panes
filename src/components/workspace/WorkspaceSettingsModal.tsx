@@ -12,8 +12,8 @@ import {
   Clapperboard,
   X,
 } from "lucide-react";
-import { ipc } from "../../lib/ipc";
-import { formatShortDate } from "../../lib/formatters";
+import { formatShortDate } from "../../contexts/shell-ui/application/formatters";
+import { getWorkspaceGateway } from "../../contexts/workspaces/application/workspaceGateway";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { toast } from "../../stores/toastStore";
 import { Dropdown } from "../shared/Dropdown";
@@ -74,7 +74,7 @@ export function WorkspaceSettingsModal({
     if (isActive) return;
     let cancelled = false;
     setReposLoading(true);
-    ipc.getRepos(currentWorkspace.id)
+    getWorkspaceGateway().getRepos(currentWorkspace.id)
       .then((r) => { if (!cancelled) setLocalRepos(r); })
       .catch(() => { if (!cancelled) setLocalRepos([]); })
       .finally(() => { if (!cancelled) setReposLoading(false); });
@@ -102,7 +102,7 @@ export function WorkspaceSettingsModal({
     try {
       const updatedWorkspace = await storeRescan(currentWorkspace.id, n);
       if (!isActive) {
-        setLocalRepos(await ipc.getRepos(currentWorkspace.id));
+        setLocalRepos(await getWorkspaceGateway().getRepos(currentWorkspace.id));
       }
       if (updatedWorkspace) {
         setDepthDraft(String(updatedWorkspace.scanDepth));
@@ -120,7 +120,7 @@ export function WorkspaceSettingsModal({
     try {
       await storeRescan(currentWorkspace.id);
       if (!isActive) {
-        setLocalRepos(await ipc.getRepos(currentWorkspace.id));
+        setLocalRepos(await getWorkspaceGateway().getRepos(currentWorkspace.id));
       }
       toast.success(t("toasts.reposRescanned"));
     } catch {
@@ -135,7 +135,7 @@ export function WorkspaceSettingsModal({
       if (isActive) {
         await storeSetTrust(repoId, level);
       } else {
-        await ipc.setRepoTrustLevel(repoId, level);
+        await getWorkspaceGateway().setRepoTrustLevel(repoId, level);
         setLocalRepos((p) => (p ?? []).map((r) => (r.id === repoId ? { ...r, trustLevel: level } : r)));
       }
     } catch {
@@ -148,7 +148,7 @@ export function WorkspaceSettingsModal({
       if (isActive) {
         await storeSetGitActive(repoId, on);
       } else {
-        await ipc.setRepoGitActive(repoId, on);
+        await getWorkspaceGateway().setRepoGitActive(repoId, on);
         setLocalRepos((p) => (p ?? []).map((r) => (r.id === repoId ? { ...r, isActive: on } : r)));
       }
     } catch {
@@ -161,7 +161,7 @@ export function WorkspaceSettingsModal({
       if (isActive) {
         await storeSetAllTrust(level);
       } else {
-        await Promise.all(repos.map((r) => ipc.setRepoTrustLevel(r.id, level)));
+        await Promise.all(repos.map((r) => getWorkspaceGateway().setRepoTrustLevel(r.id, level)));
         setLocalRepos((p) => (p ?? []).map((r) => ({ ...r, trustLevel: level })));
       }
     } catch {
@@ -187,7 +187,7 @@ export function WorkspaceSettingsModal({
 
   async function revealWorkspace() {
     try {
-      await ipc.revealPath(currentWorkspace.rootPath);
+      await getWorkspaceGateway().revealWorkspacePath(currentWorkspace.rootPath);
     } catch {
       toast.error(t("toasts.revealFailed"));
     }

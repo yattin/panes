@@ -20,17 +20,15 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import {
-  ipc,
-  listenChatTurnFinished,
-  listenGitRepoChanged,
-} from "../../lib/ipc";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
+import { getFileEditorGateway } from "../../contexts/file-editor/application/fileEditorGateway";
+import { getGitGateway } from "../../contexts/git/application/gitGateway";
 import {
   isWithinRoot,
   resolveAbsoluteFilePath,
-} from "../../lib/fileRootUtils";
-import { showWorkspaceSurface } from "../../lib/workspacePaneNavigation";
-import { isMacDesktop } from "../../lib/windowActions";
+} from "../../contexts/file-navigation/domain/pathRoots";
+import { showWorkspaceSurface } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
+import { isMacDesktop } from "../../contexts/shell-ui/application/windowActions";
 import { useFileStore } from "../../stores/fileStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -264,7 +262,7 @@ export function FileExplorer() {
       else setLoadingDirs((prev) => new Set(prev).add(dirPath));
 
       try {
-        const entries = await ipc.listDir(requestSignature.rootPath, dirPath);
+        const entries = await getFileEditorGateway().listDir(requestSignature.rootPath, dirPath);
         if (!isCurrentExplorerLoad(requestSignature, loadSignatureRef.current)) return;
         setDirContents((prev) => {
           const next = new Map(prev);
@@ -373,7 +371,7 @@ export function FileExplorer() {
     let unlisten: (() => void) | null = null;
 
     const attach = async () => {
-      const stop = await listenChatTurnFinished((event) => {
+      const stop = await getChatGateway().listenChatTurnFinished((event) => {
         if (event.workspaceId !== activeWorkspaceId) {
           return;
         }
@@ -415,14 +413,14 @@ export function FileExplorer() {
       await Promise.all(
         repoPaths.map(async (repoPath) => {
           try {
-            await ipc.watchGitRepo(repoPath);
+            await getGitGateway().watchGitRepo(repoPath);
           } catch {
             // Ignore watch failures for individual repos.
           }
         }),
       );
 
-      const stop = await listenGitRepoChanged((event) => {
+      const stop = await getGitGateway().listenGitRepoChanged((event) => {
         if (!visibleRepoPaths.has(event.repoPath)) {
           return;
         }
@@ -483,7 +481,7 @@ export function FileExplorer() {
 
     const timer = window.setTimeout(async () => {
       try {
-        const page = await ipc.searchWorkspaceFiles(
+        const page = await getFileEditorGateway().searchWorkspaceFiles(
           activeWorkspaceId,
           trimmedFilter,
           0,
@@ -833,7 +831,7 @@ export function FileExplorer() {
     (path: string | null) => {
       if (!rootPath) return;
       const fullPath = path ? `${rootPath}/${path}` : rootPath;
-      void ipc.revealPath(fullPath);
+      void getFileEditorGateway().revealPath(fullPath);
     },
     [rootPath],
   );
@@ -842,7 +840,7 @@ export function FileExplorer() {
     async (path: string) => {
       if (!rootPath) return;
       try {
-        await ipc.openPathWithDefaultApp(resolveAbsoluteFilePath(rootPath, path));
+        await getFileEditorGateway().openPathWithDefaultApp(resolveAbsoluteFilePath(rootPath, path));
       } catch {
         toast.error(t("explorer.toasts.openExternalFailed"));
       }
@@ -931,7 +929,7 @@ export function FileExplorer() {
       : newName;
 
     try {
-      await ipc.renamePath(rootPath, renamingPath, newName, activeWorkspaceId ?? null);
+      await getFileEditorGateway().renamePath(rootPath, renamingPath, newName, activeWorkspaceId ?? null);
       retargetTabsAfterRename(rootPath, renamingPath, renamedPath);
       setSelectedPaths((prev) => {
         const next = new Set<string>();
@@ -1004,13 +1002,13 @@ export function FileExplorer() {
     const targetPath = creating.parentDir ? `${creating.parentDir}/${name}` : name;
     try {
       if (creating.type === "file") {
-        await ipc.createFile(rootPath, targetPath, activeWorkspaceId ?? null);
+        await getFileEditorGateway().createFile(rootPath, targetPath, activeWorkspaceId ?? null);
         await loadDir(creating.parentDir);
         toast.success(t("explorer.toasts.created", { name }));
         void openFile(rootPath, targetPath);
         if (activeWorkspaceId) showWorkspaceSurface(activeWorkspaceId, "editor");
       } else {
-        await ipc.createDir(rootPath, targetPath, activeWorkspaceId ?? null);
+        await getFileEditorGateway().createDir(rootPath, targetPath, activeWorkspaceId ?? null);
         await loadDir(creating.parentDir);
         toast.success(t("explorer.toasts.created", { name }));
       }
@@ -1056,7 +1054,7 @@ export function FileExplorer() {
     setDeletePending(null);
 
     const results = await Promise.allSettled(
-      deletePaths.map((path) => ipc.deletePath(rootPath, path, activeWorkspaceId ?? null)),
+      deletePaths.map((path) => getFileEditorGateway().deletePath(rootPath, path, activeWorkspaceId ?? null)),
     );
 
     const successfulPaths = deletePaths.filter((_, index) => results[index]?.status === "fulfilled");

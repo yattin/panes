@@ -1,6 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { normalizeAppLocale } from "../lib/locale";
+import { normalizeAppLocale } from "../contexts/shell-ui/domain/appLocale";
 import commonEn from "./resources/en/common.json";
 import appEn from "./resources/en/app.json";
 import chatEn from "./resources/en/chat.json";

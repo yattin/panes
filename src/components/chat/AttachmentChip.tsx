@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { File, FileText, Image, X } from "lucide-react";
-import { ipc } from "../../lib/ipc";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 
 interface AttachmentChipData {
   fileName: string;
@@ -88,13 +88,13 @@ export function AttachmentChip({
     setThumbnailSrc(null);
     setThumbnailFailed(false);
 
-    if (!isImageAttachment(effectiveMimeType) || !attachment.filePath) {
+    if (!effectiveMimeType || !isImageAttachment(effectiveMimeType) || !attachment.filePath) {
       return () => {
         cancelled = true;
       };
     }
 
-    ipc.readAttachmentPreview(attachment.filePath, effectiveMimeType)
+    getChatGateway().readAttachmentPreview(attachment.filePath, effectiveMimeType)
       .then((preview) => {
         if (cancelled || !preview) {
           return;

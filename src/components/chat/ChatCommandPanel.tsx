@@ -15,7 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ipc } from "../../lib/ipc";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 import type {
   CodexExperimentalFeature,
   CodexMcpServer,
@@ -338,7 +338,7 @@ function OpenCodeSessionsPanel({
     }
 
     try {
-      const page = await ipc.listOpenCodeRemoteSessions(workspaceId, {
+      const page = await getChatGateway().listOpenCodeRemoteSessions(workspaceId, {
         cursor,
         limit: 20,
         searchTerm: searchQuery || null,

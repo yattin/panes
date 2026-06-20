@@ -19,12 +19,12 @@ import { toast } from "../../stores/toastStore";
 import { useGitStore } from "../../stores/gitStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFileStore } from "../../stores/fileStore";
-import { ipc, listenGitRepoChanged } from "../../lib/ipc";
-import { showWorkspaceEditorForDirectFileOpen } from "../../lib/workspacePaneNavigation";
+import { getGitGateway } from "../../contexts/git/application/gitGateway";
+import { showWorkspaceEditorForDirectFileOpen } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
 import {
   closeGitFlyoutIfFocusLeft,
   GitFlyoutContext,
-} from "../../lib/gitFlyoutRegion";
+} from "../../contexts/git/application/gitFlyoutRegion";
 import {
   buildDirectoryFileMap,
   buildTreeRows,
@@ -197,13 +197,13 @@ export function MultiRepoChangesView({
     const attach = async () => {
       await Promise.all(repoPaths.map(async (repoPath) => {
         try {
-          await ipc.watchGitRepo(repoPath);
+          await getGitGateway().watchGitRepo(repoPath);
         } catch {
           // Ignore watch failures for individual repos.
         }
       }));
 
-      const stop = await listenGitRepoChanged((event) => {
+      const stop = await getGitGateway().listenGitRepoChanged((event) => {
         if (!visibleRepoPaths.has(event.repoPath)) {
           return;
         }

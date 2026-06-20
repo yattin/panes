@@ -1,6 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
 import {
   Command,
@@ -32,19 +31,21 @@ import { useUpdateStore } from "../../stores/updateStore";
 import { canToggleKeepAwake, useKeepAwakeStore } from "../../stores/keepAwakeStore";
 import { useTerminalNotificationSettingsStore } from "../../stores/terminalNotificationSettingsStore";
 import { toast } from "../../stores/toastStore";
-import { ipc } from "../../lib/ipc";
-import { formatRelativeTime } from "../../lib/formatters";
+import { appLocaleRepository } from "../../contexts/shell-ui/application/appLocaleRepository";
+import { formatRelativeTime } from "../../contexts/shell-ui/application/formatters";
 import {
   emitTerminalAcceleratedRenderingChanged,
+  getTerminalAcceleratedRenderingPreference,
   getTerminalAcceleratedRenderingPreferenceVersion,
-} from "../../lib/terminalRenderingSettings";
+  setTerminalAcceleratedRenderingPreference,
+} from "../../contexts/terminal-sessions/application/terminalRenderingSettings";
 import {
   normalizeAppLocale,
   SUPPORTED_APP_LOCALES,
   type AppLocale,
-} from "../../lib/locale";
-import { handleDragMouseDown, handleDragDoubleClick } from "../../lib/windowDrag";
-import { createAndActivateWorkspaceThread } from "../../lib/newThreadActions";
+} from "../../contexts/shell-ui/domain/appLocale";
+import { handleDragMouseDown, handleDragDoubleClick } from "../../contexts/shell-ui/application/windowDrag";
+import { createAndActivateWorkspaceThread } from "../../contexts/threads/application/newThreadActions";
 import { UpdateDialog } from "../onboarding/UpdateDialog";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import { WorkspaceMoreMenu } from "../workspace/WorkspaceMoreMenu";
@@ -181,8 +182,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
   useEffect(() => {
     let cancelled = false;
     const requestVersion = getTerminalAcceleratedRenderingPreferenceVersion();
-    ipc
-      .getTerminalAcceleratedRendering()
+    getTerminalAcceleratedRenderingPreference()
       .then((enabled) => {
         if (
           !cancelled &&
@@ -304,7 +304,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
     if (locale === activeLocale) return;
 
     try {
-      const savedLocale = await ipc.setAppLocale(locale);
+      const savedLocale = await appLocaleRepository.setPersistedLocale(locale);
       await i18n.changeLanguage(savedLocale);
       toast.info(t("common:language.changed"));
     } catch {
@@ -316,7 +316,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
     const nextValue = !terminalAcceleratedRendering;
 
     try {
-      const saved = await ipc.setTerminalAcceleratedRendering(nextValue);
+      const saved = await setTerminalAcceleratedRenderingPreference(nextValue);
       setTerminalAcceleratedRendering(saved);
       emitTerminalAcceleratedRenderingChanged(saved);
     } catch {

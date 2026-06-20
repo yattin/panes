@@ -1,5 +1,5 @@
 import type { Message, ThreadStatus } from "../../types";
-import { isClaudeFamilyEngine } from "../../lib/chatEngineIds";
+import { isClaudeFamilyEngine } from "../../contexts/chat/domain/chatEngineIds";
 
 export function getPlanImplementationCodingMessage(engineId?: string | null): string {
   return isClaudeFamilyEngine(engineId)

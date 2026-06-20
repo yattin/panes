@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Archive, Loader2, Package, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { formatDateTime } from "../../lib/formatters";
+import { formatDateTime } from "../../contexts/shell-ui/application/formatters";
 import { toast } from "../../stores/toastStore";
 import { useGitStore } from "../../stores/gitStore";
 import type { Repo } from "../../types";

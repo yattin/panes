@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { open as openDirectoryDialog } from "@tauri-apps/plugin-dialog";
 import { FolderOpen, X, Loader2 } from "lucide-react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { selectDirectoryPath } from "../../contexts/shell-ui/application/fileDialogs";
 import { CueLightProjectPicker } from "./CueLightProjectPicker";
 
 interface CreateWorkspaceDialogProps {
@@ -19,8 +19,8 @@ export function CreateWorkspaceDialog({ onClose }: CreateWorkspaceDialogProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleSelectDirectory = useCallback(async () => {
-    const selected = await openDirectoryDialog({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) return;
+    const selected = await selectDirectoryPath();
+    if (!selected) return;
     setSelectedPath(selected);
   }, []);
 

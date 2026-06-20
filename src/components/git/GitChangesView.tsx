@@ -18,7 +18,7 @@ import { toast } from "../../stores/toastStore";
 import { useGitStore } from "../../stores/gitStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useFileStore } from "../../stores/fileStore";
-import { showWorkspaceEditorForDirectFileOpen } from "../../lib/workspacePaneNavigation";
+import { showWorkspaceEditorForDirectFileOpen } from "../../contexts/workspace-panes/application/workspacePaneNavigation";
 import {
   buildDirectoryFileMap,
   buildTreeRows,

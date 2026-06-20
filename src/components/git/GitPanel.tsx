@@ -18,15 +18,15 @@ import {
 } from "lucide-react";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useGitStore, type GitPanelView } from "../../stores/gitStore";
-import { ipc, listenGitRepoChanged } from "../../lib/ipc";
-import { handleDragMouseDown, handleDragDoubleClick } from "../../lib/windowDrag";
+import { getGitGateway } from "../../contexts/git/application/gitGateway";
+import { handleDragMouseDown, handleDragDoubleClick } from "../../contexts/shell-ui/application/windowDrag";
 import { toast } from "../../stores/toastStore";
 import { Dropdown } from "../shared/Dropdown";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 import {
   closeGitFlyoutIfFocusLeft,
   GitFlyoutContext,
-} from "../../lib/gitFlyoutRegion";
+} from "../../contexts/git/application/gitFlyoutRegion";
 import type { GitInitRepoStatus } from "../../types";
 import { GitChangesView } from "./GitChangesView";
 import { MultiRepoChangesView } from "./MultiRepoChangesView";
@@ -386,12 +386,12 @@ export function GitPanel({ mode = "docked", visible = true, onPin }: Props) {
 
     const attach = async () => {
       try {
-        await ipc.watchGitRepo(repoPath);
+        await getGitGateway().watchGitRepo(repoPath);
       } catch {
         return;
       }
 
-      const stop = await listenGitRepoChanged((event) => {
+      const stop = await getGitGateway().listenGitRepoChanged((event) => {
         if (event.repoPath !== repoPath) return;
         watcherRefreshQueuedRef.current = true;
         scheduleRefresh();
@@ -468,7 +468,7 @@ export function GitPanel({ mode = "docked", visible = true, onPin }: Props) {
     }
 
     let cancelled = false;
-    void ipc.initGitRepo(activeWorkspaceRootPath, true)
+    void getGitGateway().initGitRepo(activeWorkspaceRootPath, true)
       .then((status) => {
         if (!cancelled) {
           setInitRepoStatus(status);
@@ -746,7 +746,7 @@ export function GitPanel({ mode = "docked", visible = true, onPin }: Props) {
                 setInitLoading(true);
                 void (async () => {
                   try {
-                    await ipc.initGitRepo(activeWorkspaceRootPath);
+                    await getGitGateway().initGitRepo(activeWorkspaceRootPath);
                     await rescanWorkspace(activeWorkspaceId);
                     toast.success(t("panel.repositoryInitialized"));
                   } catch (e) {

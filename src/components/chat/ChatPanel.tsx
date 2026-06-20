@@ -11,7 +11,6 @@ import {
   type ClipboardEvent as ReactClipboardEvent,
   type ReactNode,
 } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { TFunction } from "i18next";
 import {
   Send,
@@ -57,11 +56,10 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useGitStore } from "../../stores/gitStore";
 import { useTerminalStore, type LayoutMode } from "../../stores/terminalStore";
 import { toast } from "../../stores/toastStore";
-import { ipc } from "../../lib/ipc";
-import { isClaudeFamilyEngine } from "../../lib/chatEngineIds";
-import { resolvePreferredOnboardingChatSelection } from "../../lib/onboarding";
-import { recordPerfMetric } from "../../lib/perfTelemetry";
-import { isMacDesktop, usesCustomWindowFrame } from "../../lib/windowActions";
+import { isClaudeFamilyEngine } from "../../contexts/chat/domain/chatEngineIds";
+import { getChatGateway } from "../../contexts/chat/application/chatGateway";
+import { resolvePreferredOnboardingChatSelection } from "../../contexts/onboarding/domain/onboardingFlow";
+import { isMacDesktop, usesCustomWindowFrame } from "../../contexts/shell-ui/application/windowActions";
 import { MessageBlocks, shouldShowClaudeUnsupportedApproval } from "./MessageBlocks";
 import { resolveEngineCapabilities } from "./engineCapabilities";
 import { buildCodexInputItems } from "./codexInputItems";
@@ -98,7 +96,9 @@ import { OpenCodeAgentPicker } from "./OpenCodeAgentPicker";
 import { ChatSlashMenu, type SlashCommand } from "./ChatSlashMenu";
 import { ChatCommandPanel, type ActiveSlashCommand } from "./ChatCommandPanel";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
-import { handleDragMouseDown, handleDragDoubleClick } from "../../lib/windowDrag";
+import { handleDragMouseDown, handleDragDoubleClick } from "../../contexts/shell-ui/application/windowDrag";
+import { listenWindowFileDrops } from "../../contexts/shell-ui/application/windowFileDrops";
+import { selectFilePaths } from "../../contexts/shell-ui/application/fileDialogs";
 import { shouldSubmitChatInput } from "./chatInputShortcuts";
 import type {
   ApprovalBlock,
@@ -560,7 +560,7 @@ function prewarmEngineTransport(engineId: string): Promise<void> {
   }
 
   lastPrewarmAttemptAtByEngine.set(engineId, now);
-  const task = ipc.prewarmEngine(engineId)
+  const task = getChatGateway().prewarmEngine(engineId)
     .catch(() => {
       // Ignore prewarm failures; engine health/setup surfaces the actionable state.
     })
@@ -1978,8 +1978,8 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     }
 
     const [skillsResult, appsResult] = await Promise.allSettled([
-      ipc.listCodexSkills(codexReferenceRoot),
-      ipc.listCodexApps(),
+      getChatGateway().listCodexSkills(codexReferenceRoot),
+      getChatGateway().listCodexApps(),
     ]);
     const skillsLoaded = skillsResult.status === "fulfilled";
     const appsLoaded = appsResult.status === "fulfilled";
@@ -2485,7 +2485,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
           const fileName = fileNameForPastedImage(file, index);
           const mimeType = file.type || guessMimeType(fileName) || "image/png";
           const dataBase64 = await blobToBase64(file);
-          const savedAttachment = await ipc.savePastedImageAttachment(fileName, mimeType, dataBase64);
+          const savedAttachment = await getChatGateway().savePastedImageAttachment(fileName, mimeType, dataBase64);
           return {
             ...savedAttachment,
             id: crypto.randomUUID(),
@@ -2574,7 +2574,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
     const bindDropListener = async () => {
       try {
-        unlisten = await getCurrentWindow().onDragDropEvent((event) => {
+        unlisten = await listenWindowFileDrops((payload) => {
           if (disposed) {
             return;
           }
@@ -2584,22 +2584,22 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
             return;
           }
 
-          if (event.payload.type === "leave") {
+          if (payload.type === "leave") {
             setIsFileDropOver(false);
             return;
           }
 
           const scale = window.devicePixelRatio || 1;
-          const logicalX = event.payload.position.x / scale;
-          const logicalY = event.payload.position.y / scale;
+          const logicalX = payload.position.x / scale;
+          const logicalY = payload.position.y / scale;
           const isInsideDropArea = isDropPositionInsideChatSection(logicalX, logicalY);
 
-          if (event.payload.type === "drop") {
+          if (payload.type === "drop") {
             setIsFileDropOver(false);
-            if (!isInsideDropArea || event.payload.paths.length === 0) {
+            if (!isInsideDropArea || payload.paths.length === 0) {
               return;
             }
-            appendAttachmentsFromPaths(event.payload.paths);
+            appendAttachmentsFromPaths(payload.paths);
             return;
           }
 
@@ -2857,7 +2857,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     let disposed = false;
     setOpenCodeCatalog(null);
     setOpenCodeCatalogLoaded(false);
-    void ipc
+    void getChatGateway()
       .getOpenCodeRuntimeCatalog(openCodeRuntimeRoot)
       .then((catalog) => {
         if (disposed) {
@@ -3118,8 +3118,8 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
     const fetchTokens = async () => {
       try {
-        const tokens = await ipc.getNativeHistoryTokens(activeThread.engineThreadId!);
-        const maxTokens = await ipc.getContextMaxTokens();
+        const tokens = await getChatGateway().getNativeHistoryTokens(activeThread.engineThreadId!);
+        const maxTokens = await getChatGateway().getContextMaxTokens();
         setNativeContextTokens(tokens);
         setNativeContextMaxTokens(maxTokens);
       } catch (err) {
@@ -3144,7 +3144,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     
     setIsCompacting(true);
     try {
-      const [before, after] = await ipc.compactNativeThread(activeThread.engineThreadId);
+      const [before, after] = await getChatGateway().compactNativeThread(activeThread.engineThreadId);
       setNativeContextTokens(after);
       toast.success(
         t("panel.contextCompacted", {
@@ -3429,7 +3429,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
     try {
       if (patch.updatePersonality || patch.updateServiceTier || patch.updateOutputSchema) {
-        const updatedThread = await ipc.setThreadCodexConfig(activeThread.id, {
+        const updatedThread = await getChatGateway().setThreadCodexConfig(activeThread.id, {
           personality: patch.updatePersonality ? patch.personality : undefined,
           serviceTier: patch.updateServiceTier ? patch.serviceTier : undefined,
           outputSchema: patch.updateOutputSchema ? patch.outputSchema : undefined,
@@ -3438,7 +3438,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       }
 
       if (patch.updateApprovalPolicy) {
-        const updatedThread = await ipc.setThreadExecutionPolicy(activeThread.id, {
+        const updatedThread = await getChatGateway().setThreadExecutionPolicy(activeThread.id, {
           approvalPolicy: patch.approvalPolicy,
         });
         applyThreadUpdateLocal(updatedThread);
@@ -3486,7 +3486,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     }
 
     try {
-      const updatedConfigThread = await ipc.setThreadCodexConfig(targetThreadId, {
+      const updatedConfigThread = await getChatGateway().setThreadCodexConfig(targetThreadId, {
         personality:
           effectiveConfig.personality === "inherit" ? null : effectiveConfig.personality,
         serviceTier:
@@ -3501,12 +3501,12 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       const approvalMode = readCodexThreadApprovalPolicyValue(latestThread);
 
       if (customApprovalDraft.value) {
-        const updatedThread = await ipc.setThreadExecutionPolicy(targetThreadId, {
+        const updatedThread = await getChatGateway().setThreadExecutionPolicy(targetThreadId, {
           approvalPolicy: customApprovalDraft.value,
         });
         applyThreadUpdateLocal(updatedThread);
       } else if (approvalMode === "custom") {
-        const updatedThread = await ipc.setThreadExecutionPolicy(targetThreadId, {
+        const updatedThread = await getChatGateway().setThreadExecutionPolicy(targetThreadId, {
           approvalPolicy: null,
         });
         applyThreadUpdateLocal(updatedThread);
@@ -3531,7 +3531,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     }
 
     try {
-      const updatedThread = await ipc.setThreadOpenCodeConfig(activeThread.id, {
+      const updatedThread = await getChatGateway().setThreadOpenCodeConfig(activeThread.id, {
         agent: agent === "build" ? null : agent,
       });
       applyThreadUpdateLocal(updatedThread);
@@ -3556,7 +3556,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
     const agent = config?.agent ?? selectedOpenCodeAgentRef.current;
     try {
-      const updatedThread = await ipc.setThreadOpenCodeConfig(targetThreadId, {
+      const updatedThread = await getChatGateway().setThreadOpenCodeConfig(targetThreadId, {
         agent: agent === "build" ? null : agent,
       });
       applyThreadUpdateLocal(updatedThread);
@@ -3596,7 +3596,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       throw new Error(t("panel.toasts.codexReviewUnavailable"));
     }
 
-    const reviewThread = await ipc.startCodexReview(
+    const reviewThread = await getChatGateway().startCodexReview(
       activeThread.id,
       request.target,
       request.delivery,
@@ -4080,7 +4080,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       }
     }
 
-    await ipc.setThreadReasoningEffort(
+    await getChatGateway().setThreadReasoningEffort(
       targetThreadId,
       submitReasoningEffort,
       submitModelId,
@@ -4125,9 +4125,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     setWorkspaceOptInPrompt(null);
 
     try {
-      await ipc.confirmWorkspaceThread(prompt.threadId, prompt.threadPaths);
+      await getChatGateway().confirmWorkspaceThread(prompt.threadId, prompt.threadPaths);
 
-      await ipc.setThreadReasoningEffort(prompt.threadId, prompt.effort, prompt.modelId);
+      await getChatGateway().setThreadReasoningEffort(prompt.threadId, prompt.effort, prompt.modelId);
       setThreadReasoningEffortLocal(prompt.threadId, prompt.effort);
       if (!(await applyCodexConfigToThread(prompt.threadId, {
         engineId: prompt.engineId,
@@ -4233,7 +4233,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     setPlanImplementationPrompt(null);
     setPlanMode(false);
     try {
-      await ipc.setThreadReasoningEffort(currentThread.id, prompt.effort, prompt.modelId);
+      await getChatGateway().setThreadReasoningEffort(currentThread.id, prompt.effort, prompt.modelId);
       setThreadReasoningEffortLocal(currentThread.id, prompt.effort);
       if (
         !(await applyCodexConfigToThread(currentThread.id, {
@@ -4313,7 +4313,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     }
 
     setThreadReasoningEffortLocal(targetThreadId, nextEffort);
-    await ipc.setThreadReasoningEffort(
+    await getChatGateway().setThreadReasoningEffort(
       targetThreadId,
       nextEffort,
       selectedModelIdRef.current,
@@ -4411,7 +4411,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     threadExecutionPolicyRequestIdsRef.current[currentThread.id] = requestId;
 
     try {
-      const updatedThread = await ipc.setThreadExecutionPolicy(
+      const updatedThread = await getChatGateway().setThreadExecutionPolicy(
         currentThread.id,
         toThreadExecutionPolicyRequest(nextPatch, isCodexThread),
       );
@@ -4466,13 +4466,12 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
   async function handleAddAttachment() {
     try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
       const attachmentFilterConfig = getAttachmentFilterConfig(t, selectedEngineId, selectedModel);
       if (attachmentFilterConfig?.supportedExtensions.length === 0) {
         toast.warning(attachmentFilterConfig.warningMessage);
         return;
       }
-      const selected = await open({
+      const paths = await selectFilePaths({
         multiple: true,
         title: attachmentFilterConfig?.title ?? t("panel.attachFiles"),
         filters: attachmentFilterConfig
@@ -4498,8 +4497,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
             )
           : undefined,
       });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      if (paths.length === 0) return;
       appendAttachmentsFromPaths(paths);
     } catch {
       // User cancelled or dialog failed
@@ -4531,7 +4529,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     messages.length >= MESSAGE_VIRTUALIZATION_THRESHOLD;
 
   useEffect(() => {
-    recordPerfMetric("chat.render.commit.ms", performance.now() - renderStartedAtRef.current, {
+    getChatGateway().recordMetric("chat.render.commit.ms", performance.now() - renderStartedAtRef.current, {
       threadId,
       messageCount: messages.length,
       virtualized: virtualizationEnabled,

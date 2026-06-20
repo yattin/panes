@@ -39,8 +39,8 @@ import {
   type WorkspacePaneSplitDirection,
   type WorkspacePaneSurfaceKind,
 } from "../../stores/workspacePaneStore";
-import { handleDragDoubleClick, handleDragMouseDown } from "../../lib/windowDrag";
-import { isMacDesktop, usesCustomWindowFrame } from "../../lib/windowActions";
+import { handleDragDoubleClick, handleDragMouseDown } from "../../contexts/shell-ui/application/windowDrag";
+import { isMacDesktop, usesCustomWindowFrame } from "../../contexts/shell-ui/application/windowActions";
 
 const LazyChatPanel = lazy(() =>
   import("../chat/ChatPanel").then((module) => ({

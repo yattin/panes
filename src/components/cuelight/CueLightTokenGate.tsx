@@ -1,9 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { KeyRound, Loader2, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { CUELIGHT_SERVER_URL, getCueLightToken, setCueLightToken } from "../../lib/cueLightConfig";
-import { ipc } from "../../lib/ipc";
+import { getCueLightGateway } from "../../contexts/cue-light/application/cueLightGateway";
 
 interface CueLightTokenGateProps {
   children: ReactNode;
@@ -16,14 +13,12 @@ export function CueLightTokenGate({ children }: CueLightTokenGateProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = getCueLightToken();
+    const gateway = getCueLightGateway();
+    const stored = gateway.readToken();
     if (stored) {
       setToken(stored);
       setHasToken(true);
-      // 同步到 Rust 后端
-      ipc.setCueLightAuthToken(stored).catch(() => {
-        // 如果同步失败，忽略错误（后端可能还没完全初始化）
-      });
+      gateway.syncAuthToken(stored).catch(() => undefined);
     }
   }, []);
 
@@ -33,20 +28,13 @@ export function CueLightTokenGate({ children }: CueLightTokenGateProps) {
     setError(null);
 
     try {
-      // 通过代理调用健康检查验证 Token
-      await ipc.cueLightProxy({
-        method: "GET",
-        serverUrl: CUELIGHT_SERVER_URL,
-        path: "/api/projects",
-        authToken: token.trim(),
-      });
-      // 验证成功，保存 Token
+      const gateway = getCueLightGateway();
       const trimmedToken = token.trim();
-      setCueLightToken(trimmedToken);
-      await ipc.setCueLightAuthToken(trimmedToken);
+      await gateway.validateToken(trimmedToken);
+      gateway.saveToken(trimmedToken);
+      await gateway.syncAuthToken(trimmedToken);
       setHasToken(true);
-      // 验证成功后最大化窗口
-      getCurrentWindow().maximize().catch(() => {});
+      gateway.maximizeWindow().catch(() => undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "验证失败，请检查 Token 是否正确");
     } finally {
@@ -116,7 +104,7 @@ export function CueLightTokenGate({ children }: CueLightTokenGateProps) {
           <button
             type="button"
             className="cuelight-token-gate-link"
-            onClick={() => void open(CUELIGHT_SERVER_URL)}
+            onClick={() => void getCueLightGateway().openServer()}
           >
             <ExternalLink size={12} />
             点击这里获取

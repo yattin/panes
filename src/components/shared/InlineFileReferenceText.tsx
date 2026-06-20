@@ -1,10 +1,10 @@
 import { Fragment, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { findFileReferenceMatches } from "../../lib/fileReferences";
+import { findFileReferenceMatches } from "../../contexts/file-navigation/domain/fileReferences";
 import {
   handleEditorFileReferenceClick,
   type EditorFileReferenceContext,
-} from "../../lib/openEditorFileReference";
+} from "../../contexts/file-navigation/application/openEditorFileReference";
 
 interface InlineFileReferenceTextProps extends EditorFileReferenceContext {
   text: string;

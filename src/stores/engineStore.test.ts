@@ -5,15 +5,16 @@ const mockIpc = vi.hoisted(() => ({
   engineHealth: vi.fn(),
 }));
 
-vi.mock("../lib/ipc", () => ({
-  ipc: mockIpc,
-}));
-
+import { configureEngineGateway } from "../contexts/engines/application/engineGateway";
 import { useEngineStore } from "./engineStore";
 
 describe("engineStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configureEngineGateway({
+      listEngines: mockIpc.listEngines,
+      getEngineHealth: mockIpc.engineHealth,
+    });
     useEngineStore.setState({
       engines: [],
       health: {},
