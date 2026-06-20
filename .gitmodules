@@ -1,3 +1,6 @@
 [submodule "vendor/free-code"]
 	path = vendor/free-code
 	url = https://github.com/freecodexyz/free-code.git
+[submodule "vendor/claurst"]
+	path = vendor/claurst
+	url = https://github.com/Kuberwastaken/claurst.git

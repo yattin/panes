@@ -9,6 +9,8 @@ src-tauri/helper/build/
 *.log
 .agent-workspace/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Claude Code
 .claude/
