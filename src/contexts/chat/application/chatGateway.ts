@@ -99,6 +99,7 @@ export interface ChatGateway {
   ): Promise<CodexRemoteThreadPage>;
   listCodexApps(): Promise<CodexApp[]>;
   listCodexSkills(cwd: string): Promise<CodexSkill[]>;
+  listNativeSkills(cwd: string): Promise<CodexSkill[]>;
   listOpenCodeRemoteSessions(
     workspaceId: string,
     options?: OpenCodeRemoteSessionListOptions,
@@ -128,6 +129,7 @@ export interface ChatGateway {
     inputItems?: ChatInputItem[] | null,
     planMode?: boolean | null,
     clientTurnId?: string | null,
+    displayMessage?: string | null,
   ): Promise<string>;
   setThreadCodexConfig(threadId: string, patch: ThreadCodexConfigPatch): Promise<Thread>;
   setThreadExecutionPolicy(
@@ -153,6 +155,7 @@ export interface ChatGateway {
     attachments?: ChatAttachment[] | null,
     inputItems?: ChatInputItem[] | null,
     planMode?: boolean | null,
+    displayMessage?: string | null,
   ): Promise<void>;
   syncThreadFromEngine(threadId: string): Promise<Thread>;
   wallClockNow(): number;

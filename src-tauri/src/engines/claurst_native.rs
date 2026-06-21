@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex as StdMutex},
+    time::Instant,
 };
 
 use anyhow::Context;
@@ -21,7 +22,7 @@ use panes_agent::{
     },
     infrastructure::{
         anthropic::AnthropicMessagesClient,
-        env_files, memory_files,
+        env_files, google_gemini::GoogleGeminiClient, memory_files,
         native_tools::{self, NativeToolExecutor},
         openai_compatible::OpenAiCompatibleClient,
         skills,
@@ -30,7 +31,7 @@ use panes_agent::{
     SystemContext,
 };
 use rusqlite::params;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -71,6 +72,7 @@ struct PendingApproval {
 enum ClaurstModelClient {
     Anthropic(AnthropicMessagesClient),
     OpenAiCompatible(OpenAiCompatibleClient),
+    Google(GoogleGeminiClient),
 }
 
 #[async_trait]
@@ -82,6 +84,7 @@ impl ModelClient for ClaurstModelClient {
         match self {
             Self::Anthropic(client) => client.stream(request).await,
             Self::OpenAiCompatible(client) => client.stream(request).await,
+            Self::Google(client) => client.stream(request).await,
         }
     }
 }
@@ -94,6 +97,77 @@ impl ClaurstNativeEngine {
     pub fn set_db(&mut self, db: crate::db::Database) {
         self.db = Some(db);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Provider Registry — 参考 vendor/claurst 的 Provider Registry 架构
+// 每个模型源是独立的 Provider，根据配置 + 环境变量凭据动态注册。
+// ---------------------------------------------------------------------------
+
+use crate::provider_config::ProviderSettings;
+
+/// 一个模型源(provider)的注册配置。
+#[allow(dead_code)]
+struct ProviderConfig {
+    /// 标识符，用于 model ID 前缀 (e.g. "openai", "openrouter")
+    id: &'static str,
+    /// 检查凭据是否可用的环境变量名
+    api_key_env: &'static str,
+    /// 该 provider 提供的模型列表
+    models: Vec<ModelInfo>,
+}
+
+/// 检查指定 provider 是否启用且有凭据可用。
+fn provider_is_available(config: &ProviderConfig, settings: &ProviderSettings) -> bool {
+    if !settings.is_enabled(config.id) {
+        return false;
+    }
+    settings.resolve_api_key(config.id, config.api_key_env).is_some()
+}
+
+/// 构建所有 Provider 注册表（含全部定义，调用者负责过滤）。
+fn provider_registry() -> Vec<ProviderConfig> {
+    vec![
+        ProviderConfig {
+            id: "anthropic",
+            api_key_env: "ANTHROPIC_API_KEY",
+            models: vec![
+                model_info("claude-opus-4-8", "Opus 4.8", "Anthropic Claude Opus", false),
+                model_info("claude-sonnet-4-6", "Sonnet 4.6", "Anthropic Claude Sonnet", true),
+                model_info("claude-haiku-4-5-20251001", "Haiku 4.5", "Anthropic Claude Haiku", false),
+            ],
+        },
+        ProviderConfig {
+            id: "openai",
+            api_key_env: "OPENAI_API_KEY",
+            models: vec![
+                model_info("openai/gpt-5.5", "GPT-5.5", "OpenAI GPT-5.5", false),
+                model_info("openai/gpt-5.4-mini", "GPT-5.4 Mini", "OpenAI GPT-5.4 Mini", false),
+            ],
+        },
+        ProviderConfig {
+            id: "google",
+            api_key_env: "GOOGLE_API_KEY",
+            models: vec![
+                model_info("google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini Flash", false),
+                model_info("google/gemini-3.5-pro", "Gemini 3.5 Pro", "Google Gemini Pro", false),
+            ],
+        },
+        ProviderConfig {
+            id: "openrouter",
+            api_key_env: "OPENROUTER_API_KEY",
+            models: vec![
+                model_info("openrouter/google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini via OpenRouter", false),
+                model_info("openrouter/qwen/qwen3.7-max", "Qwen3.7-Max", "Qwen via OpenRouter", false),
+                model_info("openrouter/qwen/qwen3.7-plus", "Qwen3.7-Plus", "Qwen via OpenRouter", false),
+                model_info("openrouter/deepseek/deepseek-v4-pro", "DeepSeek-V4-Pro", "DeepSeek via OpenRouter", false),
+                model_info("openrouter/deepseek/deepseek-v4-flash", "DeepSeek-V4-Flash", "DeepSeek via OpenRouter", false),
+                model_info("openrouter/zhipu/glm-5.2", "GLM-5.2", "Zhipu via OpenRouter", false),
+                model_info("openrouter/moonshotai/kimi-k2.6", "Kimi-K2.6", "Moonshot AI via OpenRouter", false),
+                model_info("openrouter/minimax/minimax-m3", "MiniMax-M3", "MiniMax via OpenRouter", false),
+            ],
+        },
+    ]
 }
 
 fn model_info(id: &str, display_name: &str, description: &str, is_default: bool) -> ModelInfo {
@@ -122,46 +196,38 @@ impl Engine for ClaurstNativeEngine {
     }
 
     fn name(&self) -> &str {
-        "CueLight Agent"
+        "内置"
     }
 
     fn models(&self) -> Vec<ModelInfo> {
-        vec![
-            model_info(
-                AnthropicMessagesClient::default_model(),
-                "Claude Sonnet 4.6",
-                "Anthropic Messages API via claurst-native",
-                true,
-            ),
-            model_info(
-                "openai/gpt-4o",
-                "OpenAI GPT-4o",
-                "OpenAI-compatible chat completions via claurst-native",
-                false,
-            ),
-            model_info(
-                "openrouter/anthropic/claude-sonnet-4",
-                "OpenRouter Claude Sonnet",
-                "OpenRouter OpenAI-compatible API via claurst-native",
-                false,
-            ),
-            model_info(
-                "ollama/llama3.2",
-                "Ollama llama3.2",
-                "Local Ollama OpenAI-compatible API via claurst-native",
-                false,
-            ),
-        ]
+        // 确保 .env 已加载，使环境变量检查能正确反映用户配置
+        if let Ok(cwd) = std::env::current_dir() {
+            env_files::load_dotenv_for_dir(&cwd);
+        }
+
+        let settings = ProviderSettings::load();
+        let mut models = Vec::new();
+        for provider in provider_registry() {
+            if !provider_is_available(&provider, &settings) {
+                continue;
+            }
+            for model in provider.models {
+                if settings.is_model_enabled(provider.id, &model.id) {
+                    models.push(model);
+                }
+            }
+        }
+        models
     }
 
     async fn is_available(&self) -> bool {
         if let Ok(cwd) = std::env::current_dir() {
             env_files::load_dotenv_for_dir(&cwd);
         }
-        AnthropicMessagesClient::has_env_credentials()
-            || OpenAiCompatibleClient::has_env_credentials("openai")
-            || OpenAiCompatibleClient::has_env_credentials("openrouter")
-            || OpenAiCompatibleClient::has_env_credentials("ollama")
+        let settings = ProviderSettings::load();
+        provider_registry()
+            .iter()
+            .any(|p| provider_is_available(p, &settings))
     }
 
     async fn start_thread(
@@ -230,8 +296,11 @@ impl Engine for ClaurstNativeEngine {
         let tool_specs = tool_specs_for_thread(state.cuelight_context.as_ref());
         let event_sink = TauriEventSink {
             event_tx: event_tx.clone(),
+            action_starts: Arc::new(StdMutex::new(HashMap::new())),
         };
-        let model_client = model_client_for_provider(&provider_profile, &tool_specs)?;
+        let provider_settings = ProviderSettings::load();
+        let model_client =
+            model_client_for_provider(&provider_profile, &tool_specs, &provider_settings)?;
         let agent_profile = agent_profile_from_metadata(thread_metadata);
         let ports = ClaurstRuntimePorts {
             model: model_client,
@@ -255,6 +324,7 @@ impl Engine for ClaurstNativeEngine {
                     .map(|profile| profile.access.clone())
                     .unwrap_or(AgentAccessLevel::Full),
                 provider_profile: provider_profile.clone(),
+                provider_settings: provider_settings.clone(),
                 tool_specs: tool_specs_without_agent(&tool_specs),
                 skill_catalog: skill_catalog.clone(),
                 plugin_catalog: plugin_catalog.clone(),
@@ -420,12 +490,62 @@ where
 
 struct TauriEventSink {
     event_tx: mpsc::Sender<EngineEvent>,
+    action_starts: Arc<StdMutex<HashMap<String, Instant>>>,
 }
 
 #[async_trait]
 impl EventSink for TauriEventSink {
     async fn emit(&self, event: AgentEvent) -> anyhow::Result<()> {
         match event {
+            AgentEvent::ActionStarted {
+                action_id,
+                action_type,
+                input,
+            } => {
+                if let Ok(mut starts) = self.action_starts.lock() {
+                    starts.insert(action_id.clone(), Instant::now());
+                }
+                self.event_tx
+                    .send(EngineEvent::ActionStarted {
+                        action_id,
+                        engine_action_id: None,
+                        action_type: map_action_type(&action_type),
+                        summary: action_type.clone(),
+                        display_label: cue_light_tool_label(&action_type).map(str::to_string),
+                        display_subtitle: None,
+                        details: input,
+                    })
+                    .await?;
+            }
+            AgentEvent::ActionCompleted {
+                action_id,
+                output,
+                is_error,
+            } => {
+                let duration_ms = self
+                    .action_starts
+                    .lock()
+                    .ok()
+                    .and_then(|mut starts| starts.remove(&action_id))
+                    .map(|started| {
+                        u64::try_from(started.elapsed().as_millis())
+                            .unwrap_or(u64::MAX)
+                            .max(1)
+                    })
+                    .unwrap_or(0);
+                self.event_tx
+                    .send(EngineEvent::ActionCompleted {
+                        action_id,
+                        result: ActionResult {
+                            success: !is_error,
+                            output: if is_error { None } else { Some(output.clone()) },
+                            error: if is_error { Some(output) } else { None },
+                            diff: None,
+                            duration_ms,
+                        },
+                    })
+                    .await?;
+            }
             AgentEvent::TurnCompleted {
                 token_usage,
                 metrics,
@@ -526,6 +646,7 @@ struct ClaurstToolExecutor {
     sandbox_mode: Option<String>,
     agent_access: AgentAccessLevel,
     provider_profile: ProviderProfile,
+    provider_settings: ProviderSettings,
     tool_specs: Vec<ToolSpec>,
     skill_catalog: Vec<SkillDefinition>,
     plugin_catalog: Vec<PluginManifest>,
@@ -632,7 +753,8 @@ impl ClaurstToolExecutor {
             });
         }
 
-        let model = model_client_for_provider(&provider_profile, &self.tool_specs)?;
+        let model =
+            model_client_for_provider(&provider_profile, &self.tool_specs, &self.provider_settings)?;
         let sub_events = LocalEventSink::default();
         let ports = ClaurstRuntimePorts {
             model,
@@ -645,6 +767,7 @@ impl ClaurstToolExecutor {
                 sandbox_mode: self.sandbox_mode.clone(),
                 agent_access: agent_profile.access.clone(),
                 provider_profile: provider_profile.clone(),
+                provider_settings: self.provider_settings.clone(),
                 tool_specs: self.tool_specs.clone(),
                 skill_catalog: self.skill_catalog.clone(),
                 plugin_catalog: self.plugin_catalog.clone(),
@@ -807,27 +930,130 @@ fn agent_tool_spec() -> ToolSpec {
 fn model_client_for_provider(
     provider: &ProviderProfile,
     tool_specs: &[ToolSpec],
+    settings: &ProviderSettings,
 ) -> anyhow::Result<ClaurstModelClient> {
+    let resolved = resolve_provider_credentials(provider, settings)?;
     match provider.kind {
         ProviderKind::Anthropic => Ok(ClaurstModelClient::Anthropic(
-            AnthropicMessagesClient::from_env(provider.model.clone())?.with_tool_specs(
-                tool_specs
-                    .iter()
-                    .cloned()
-                    .map(tool_spec_to_anthropic)
-                    .collect(),
-            ),
+            AnthropicMessagesClient::new(resolved.api_key, resolved.api_base, provider.model.clone())
+                .with_tool_specs(
+                    tool_specs
+                        .iter()
+                        .cloned()
+                        .map(tool_spec_to_anthropic)
+                        .collect(),
+                ),
         )),
         ProviderKind::OpenAiCompatible => Ok(ClaurstModelClient::OpenAiCompatible(
-            OpenAiCompatibleClient::from_env(
-                &provider.id,
+            OpenAiCompatibleClient::new(
+                Some(resolved.api_key),
+                resolved.api_base,
                 provider.model.clone(),
-                provider.api_base.clone(),
-                provider.api_key_env.clone(),
-            )?
+            )
             .with_tool_specs(tool_specs.to_vec()),
         )),
+        ProviderKind::Google => Ok(ClaurstModelClient::Google(
+            GoogleGeminiClient::new(resolved.api_key, resolved.api_base, provider.model.clone())
+                .with_tool_specs(tool_specs_to_gemini(tool_specs)),
+        )),
     }
+}
+
+/// Resolved (key, base) pair for a provider, taking saved `ProviderSettings`
+/// first and falling back to environment variables.  This is the single place
+/// where stored config becomes the request-time credential — previously each
+/// client's `from_env` only read env vars, so UI-entered keys never reached
+/// the API call.
+struct ResolvedCredentials {
+    api_key: String,
+    api_base: String,
+}
+
+/// Pure credential resolver — kept free of I/O so it is unit-testable.
+///
+/// Priority: stored config (`ProviderSettings`) → environment variable →
+/// provider default.  `api_key` has no default; missing both store and env is
+/// an error.
+fn resolve_provider_credentials(
+    provider: &ProviderProfile,
+    settings: &ProviderSettings,
+) -> anyhow::Result<ResolvedCredentials> {
+    let (key_env, base_envs, default_base): (&str, &[&str], &str) = match provider.kind {
+        ProviderKind::Anthropic => (
+            "ANTHROPIC_API_KEY",
+            &["ANTHROPIC_BASE_URL", "ANTHROPIC_API_BASE", "CLAURST_API_BASE"][..],
+            "https://api.anthropic.com",
+        ),
+        ProviderKind::Google => (
+            "GOOGLE_API_KEY",
+            &["GOOGLE_BASE_URL", "GOOGLE_API_BASE"][..],
+            "https://generativelanguage.googleapis.com",
+        ),
+        ProviderKind::OpenAiCompatible => {
+            let key_env = match provider.id.as_str() {
+                "openrouter" => "OPENROUTER_API_KEY",
+                "ollama" => "", // no key for local ollama
+                _ => "",
+            };
+            let default_base = match provider.id.as_str() {
+                "openrouter" => "https://openrouter.ai/api",
+                "ollama" => "http://localhost:11434",
+                _ => "https://api.openai.com",
+            };
+            (key_env, &[][..], default_base)
+        }
+    };
+
+    // Ollama has no api key.  For other OpenAI-compatible providers without a
+    // stored key, fall back to the conventional env var names.
+    let api_key = settings.resolve_api_key(&provider.id, key_env).or_else(|| {
+        if key_env.is_empty() {
+            match provider.id.as_str() {
+                "ollama" => None,
+                _ => std::env::var("OPENAI_COMPATIBLE_API_KEY")
+                    .ok()
+                    .filter(|v| !v.trim().is_empty())
+                    .or_else(|| {
+                        std::env::var("OPENAI_API_KEY")
+                            .ok()
+                            .filter(|v| !v.trim().is_empty())
+                    }),
+            }
+        } else {
+            None
+        }
+    });
+
+    let api_base = settings
+        .resolve_api_base(&provider.id, base_envs)
+        .unwrap_or_else(|| default_base.to_string());
+
+    match provider.kind {
+        ProviderKind::OpenAiCompatible if provider.id == "ollama" => {
+            // Ollama needs no key.
+            Ok(ResolvedCredentials { api_key: String::new(), api_base })
+        }
+        _ => {
+            let api_key =
+                api_key.with_context(|| format!("missing API key for provider `{}`", provider.id))?;
+            Ok(ResolvedCredentials { api_key, api_base })
+        }
+    }
+}
+
+/// Gemini `functionDeclarations` expect a slightly different shape than the
+/// raw `ToolSpec`.  Convert here so the client stays generic.
+fn tool_specs_to_gemini(specs: &[ToolSpec]) -> Vec<Value> {
+    specs
+        .iter()
+        .map(|spec| {
+            json!({
+                "name": spec.name,
+                "description": spec.description,
+                "parameters": spec.input_schema,
+            })
+        })
+        .collect()
 }
 
 fn tool_spec_to_anthropic(spec: ToolSpec) -> Value {
@@ -1146,8 +1372,8 @@ fn map_agent_event(event: AgentEvent) -> EngineEvent {
             action_id,
             engine_action_id: None,
             action_type: map_action_type(&action_type),
-            summary: action_type,
-            display_label: None,
+            summary: action_type.clone(),
+            display_label: cue_light_tool_label(&action_type).map(str::to_string),
             display_subtitle: None,
             details: input,
         },
@@ -1232,6 +1458,49 @@ fn map_action_type(tool_name: &str) -> ActionType {
         "execute_command" => ActionType::Command,
         "list_files" | "search" | "grep" | "glob" => ActionType::Search,
         _ => ActionType::Other,
+    }
+}
+
+fn cue_light_tool_label(tool_name: &str) -> Option<&'static str> {
+    match tool_name {
+        "cuelight_project_status" => Some("查看项目状态"),
+        "cuelight_get_story_bible" => Some("读取故事设计"),
+        "cuelight_update_story_bible" => Some("更新故事设计"),
+        "cuelight_get_visual_bible" => Some("读取视觉设计"),
+        "cuelight_update_visual_bible" => Some("更新视觉设计"),
+        "cuelight_list_characters" => Some("列出角色资产"),
+        "cuelight_get_character" => Some("读取角色资产"),
+        "cuelight_create_character" => Some("创建角色资产"),
+        "cuelight_update_character" => Some("更新角色资产"),
+        "cuelight_delete_character" => Some("删除角色资产"),
+        "cuelight_list_scenes" => Some("列出场景资产"),
+        "cuelight_get_scene" => Some("读取场景资产"),
+        "cuelight_create_scene" => Some("创建场景资产"),
+        "cuelight_update_scene" => Some("更新场景资产"),
+        "cuelight_delete_scene" => Some("删除场景资产"),
+        "cuelight_list_props" => Some("列出道具资产"),
+        "cuelight_get_prop" => Some("读取道具资产"),
+        "cuelight_create_prop" => Some("创建道具资产"),
+        "cuelight_update_prop" => Some("更新道具资产"),
+        "cuelight_delete_prop" => Some("删除道具资产"),
+        "cuelight_list_episodes" => Some("列出分集剧本"),
+        "cuelight_get_episode" => Some("读取分集剧本"),
+        "cuelight_create_episode" => Some("创建分集剧本"),
+        "cuelight_update_episode" => Some("更新分集剧本"),
+        "cuelight_delete_episode" => Some("删除分集剧本"),
+        "cuelight_list_storyboards" => Some("列出分镜规划"),
+        "cuelight_get_storyboard" => Some("读取分镜规划"),
+        "cuelight_create_storyboard" => Some("创建分镜规划"),
+        "cuelight_update_storyboard" => Some("更新分镜规划"),
+        "cuelight_delete_storyboard" => Some("删除分镜规划"),
+        "cuelight_batch_update_storyboards" => Some("批量更新分镜规划"),
+        "cuelight_upload_file" => Some("上传参考文件"),
+        "cuelight_generate_image" => Some("生成图片"),
+        "cuelight_generate_video" => Some("生成视频"),
+        "cuelight_task_status" => Some("查询任务状态"),
+        "cuelight_list_models" => Some("查看生成模型"),
+        "cuelight_download_original_script" => Some("下载剧本原文"),
+        _ => None,
     }
 }
 
@@ -1379,6 +1648,52 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn event_sink_labels_cuelight_actions_and_records_duration() {
+        let (event_tx, mut event_rx) = mpsc::channel(4);
+        let sink = TauriEventSink {
+            event_tx,
+            action_starts: Arc::new(StdMutex::new(HashMap::new())),
+        };
+
+        sink.emit(AgentEvent::ActionStarted {
+            action_id: "action-visual".to_string(),
+            action_type: "cuelight_get_visual_bible".to_string(),
+            input: json!({}),
+        })
+        .await
+        .expect("action start should emit");
+
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+
+        sink.emit(AgentEvent::ActionCompleted {
+            action_id: "action-visual".to_string(),
+            output: "{}".to_string(),
+            is_error: false,
+        })
+        .await
+        .expect("action completion should emit");
+
+        match event_rx.recv().await {
+            Some(EngineEvent::ActionStarted {
+                summary,
+                display_label,
+                ..
+            }) => {
+                assert_eq!(summary, "cuelight_get_visual_bible");
+                assert_eq!(display_label.as_deref(), Some("读取视觉设计"));
+            }
+            other => panic!("expected action started, got {other:?}"),
+        }
+
+        match event_rx.recv().await {
+            Some(EngineEvent::ActionCompleted { result, .. }) => {
+                assert!(result.duration_ms > 0);
+            }
+            other => panic!("expected action completed, got {other:?}"),
+        }
+    }
+
     #[test]
     fn expanded_turn_message_embeds_skill_prompt_items() {
         let root = std::env::temp_dir().join(format!("panes-skill-{}", Uuid::new_v4()));
@@ -1406,5 +1721,63 @@ mod tests {
         assert!(message.contains("Use the project conventions."));
 
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolve_credentials_uses_stored_key_for_anthropic() {
+        // Stored config must take precedence and avoid any env-var dependency,
+        // which is the whole point of the fix.
+        let mut settings = ProviderSettings::default();
+        settings.providers.insert(
+            "anthropic".to_string(),
+            crate::provider_config::ProviderConfigEntry {
+                enabled: true,
+                api_key: Some("sk-stored-anthropic".to_string()),
+                api_base: Some("https://custom.anthropic.example".to_string()),
+                models: HashMap::new(),
+            },
+        );
+        let profile = ProviderProfile::infer("anthropic", "claude-sonnet-4-6");
+
+        let resolved = resolve_provider_credentials(&profile, &settings).expect("should resolve");
+
+        assert_eq!(resolved.api_key, "sk-stored-anthropic");
+        assert_eq!(resolved.api_base, "https://custom.anthropic.example");
+    }
+
+    #[test]
+    fn resolve_credentials_falls_back_to_default_base_when_unset() {
+        let mut settings = ProviderSettings::default();
+        settings.providers.insert(
+            "google".to_string(),
+            crate::provider_config::ProviderConfigEntry {
+                enabled: true,
+                api_key: Some("google-key".to_string()),
+                api_base: None,
+                models: HashMap::new(),
+            },
+        );
+        let profile = ProviderProfile::infer("google", "gemini-3.5-flash");
+
+        let resolved = resolve_provider_credentials(&profile, &settings).expect("should resolve");
+
+        assert_eq!(resolved.api_key, "google-key");
+        assert_eq!(
+            resolved.api_base,
+            "https://generativelanguage.googleapis.com"
+        );
+    }
+
+    #[test]
+    fn resolve_credentials_ollama_needs_no_key() {
+        // Ollama is keyless; it should resolve to an empty key + its default
+        // base URL regardless of stored config or env vars.
+        let settings = ProviderSettings::default();
+        let profile = ProviderProfile::infer("ollama", "llama3.2");
+
+        let resolved = resolve_provider_credentials(&profile, &settings).expect("should resolve");
+
+        assert_eq!(resolved.api_key, "");
+        assert_eq!(resolved.api_base, "http://localhost:11434");
     }
 }

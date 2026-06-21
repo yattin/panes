@@ -236,10 +236,13 @@ export function PermissionPicker({
 
     const rect = triggerRef.current.getBoundingClientRect();
     const left = Math.max(8, Math.min(rect.left, window.innerWidth - 460));
+    const bottom = window.innerHeight - rect.top + 6;
 
-    setPos({
-      bottom: window.innerHeight - rect.top + 6,
-      left,
+    setPos((current) => {
+      if (current.bottom === bottom && current.left === left) {
+        return current;
+      }
+      return { bottom, left };
     });
   }, [open]);
 

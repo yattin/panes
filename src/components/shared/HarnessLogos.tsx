@@ -85,6 +85,8 @@ export function getHarnessIcon(id: string, size = 16): ReactNode {
       return <span style={style}><CodexLogo size={size} /></span>;
     case "claude":
     case "claude-code":
+    case "claude-code-native":
+    case "claurst-native":
       return <span style={style}><ClaudeCodeLogo size={size} /></span>;
     case "gemini-cli":
       return <span style={style}><GeminiCliLogo size={size} /></span>;

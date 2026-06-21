@@ -300,6 +300,7 @@ export interface ActionBlock {
   summary: string;
   displayLabel?: string;
   displaySubtitle?: string;
+  startedAt?: number;
   details: Record<string, unknown>;
   outputChunks: Array<{ stream: "stdout" | "stderr" | "stdin"; content: string }>;
   outputDeferred?: boolean;
@@ -310,7 +311,7 @@ export interface ActionBlock {
     output?: string;
     error?: string;
     diff?: string;
-    durationMs: number;
+    durationMs?: number;
   };
 }
 

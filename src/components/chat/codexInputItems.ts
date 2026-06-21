@@ -45,7 +45,7 @@ function pushTextItem(items: ChatInputItem[], text: string) {
   items.push({ type: "text", text });
 }
 
-export function buildCodexInputItems(
+export function buildRuntimeInputItems(
   message: string,
   skills: CodexSkill[],
   apps: CodexApp[],
@@ -90,3 +90,5 @@ export function buildCodexInputItems(
 
   return items;
 }
+
+export const buildCodexInputItems = buildRuntimeInputItems;

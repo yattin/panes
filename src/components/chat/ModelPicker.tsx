@@ -318,11 +318,14 @@ export function ModelPicker({
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverWidth = activeEngineId === "opencode" ? 680 : 440;
+    const popoverWidth = activeEngineId === "opencode" ? 680 : 240;
     const left = Math.max(8, Math.min(rect.left, window.innerWidth - popoverWidth - 8));
-    setPos({
-      bottom: window.innerHeight - rect.top + 6,
-      left,
+    const bottom = window.innerHeight - rect.top + 6;
+    setPos((current) => {
+      if (current.bottom === bottom && current.left === left) {
+        return current;
+      }
+      return { bottom, left };
     });
   }, [activeEngineId, open]);
 
@@ -357,6 +360,17 @@ export function ModelPicker({
     if (disabled) return;
     setOpen((prev) => !prev);
   }, [disabled]);
+
+  // Sort engines: claurst-native (内置) first, then the rest.
+  // External agents (codex, opencode) are temporarily hidden.
+  const sortedEngines = useMemo(() => {
+    const visible = engines.filter((e) => e.id === "claurst-native");
+    return visible.sort((a, b) => {
+      if (a.id === "claurst-native") return -1;
+      if (b.id === "claurst-native") return 1;
+      return 0;
+    });
+  }, [engines]);
 
   // Resolve current selection for trigger label
   const currentEngine = engines.find((e) => e.id === selectedEngineId) ?? engines[0];
@@ -401,7 +415,7 @@ export function ModelPicker({
 
   function handleModelSelect(engineId: string, modelId: string) {
     onEngineModelChange(engineId, modelId);
-    // Keep popover open so the user can adjust reasoning effort
+    setOpen(false);
   }
 
   function renderFlatModelList() {
@@ -609,31 +623,33 @@ export function ModelPicker({
             left: pos.left,
           }}
         >
-          {/* Engine rail */}
-          <div className="mp-rail">
-            <div className="mp-rail-label">{t("modelPicker.engine")}</div>
-            {engines.map((engine) => {
-              const isActive = engine.id === activeEngineId;
-              const engineHealth = health[engine.id];
-              const available = engineHealth?.available !== false;
-              return (
-                <button
-                  key={engine.id}
-                  type="button"
-                  className={`mp-rail-engine${isActive ? " mp-rail-engine-active" : ""}`}
-                  onClick={() => setActiveEngineId(engine.id)}
-                >
-                  <span className="mp-rail-engine-icon">
-                    {getHarnessIcon(engine.id, 15)}
-                  </span>
-                  <span className="mp-rail-engine-name">{engine.name}</span>
-                  <span
-                    className={`mp-rail-dot${available ? " mp-rail-dot-ok" : " mp-rail-dot-err"}`}
-                  />
-                </button>
-              );
-            })}
-          </div>
+          {/* Engine rail — hidden when only 1 engine visible */}
+          {sortedEngines.length > 1 && (
+            <div className="mp-rail">
+              <div className="mp-rail-label">{t("modelPicker.engine")}</div>
+              {sortedEngines.map((engine) => {
+                const isActive = engine.id === activeEngineId;
+                const engineHealth = health[engine.id];
+                const available = engineHealth?.available !== false;
+                return (
+                  <button
+                    key={engine.id}
+                    type="button"
+                    className={`mp-rail-engine${isActive ? " mp-rail-engine-active" : ""}`}
+                    onClick={() => setActiveEngineId(engine.id)}
+                  >
+                    <span className="mp-rail-engine-icon">
+                      {getHarnessIcon(engine.id, 15)}
+                    </span>
+                    <span className="mp-rail-engine-name">{engine.name}</span>
+                    <span
+                      className={`mp-rail-dot${available ? " mp-rail-dot-ok" : " mp-rail-dot-err"}`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Models panel */}
           <div className="mp-models">
@@ -667,9 +683,9 @@ function ModelRow({
   model,
   engineId,
   isSelected,
-  selectedEffort,
+  selectedEffort: _selectedEffort,
   onSelect,
-  onEffortChange,
+  onEffortChange: _onEffortChange,
 }: {
   model: EngineModel;
   engineId: string;
@@ -678,12 +694,6 @@ function ModelRow({
   onSelect: (engineId: string, modelId: string) => void;
   onEffortChange: (effort: string) => void;
 }) {
-  const { t } = useTranslation("chat");
-  const efforts = model.supportedReasoningEfforts ?? [];
-  const showControls = efforts.length > 0;
-  const metadataChips = modelMetadataChips(t, model);
-  const showMetadataChips = isSelected;
-  const showDescription = shouldShowModelDescription(engineId, model);
   const modelClassName = [
     "mp-model",
     isSelected ? "mp-model-selected" : "",
@@ -699,55 +709,14 @@ function ModelRow({
         onClick={() => onSelect(engineId, model.id)}
       >
         <div className="mp-model-info">
-          <div className="mp-model-name-row">
-            <span className="mp-model-name">
-              {formatModelName(model.displayName)}
-            </span>
-            {model.isDefault && (
-              <span className="mp-model-default">{t("modelPicker.default")}</span>
-            )}
-          </div>
-          {showDescription && (
-            <span className="mp-model-desc">{model.description}</span>
-          )}
-          {showMetadataChips && metadataChips.length > 0 ? (
-            <span className="mp-model-meta">
-              {metadataChips.map((chip) => (
-                <span key={chip.label} className="mp-model-meta-chip" title={chip.title}>
-                  {chip.label}
-                </span>
-              ))}
-            </span>
-          ) : null}
+          <span className="mp-model-name">
+            {formatModelName(model.displayName)}
+          </span>
         </div>
         {isSelected && (
           <Check size={13} className="mp-model-check" />
         )}
       </button>
-
-      {isSelected && showControls && (
-        <div className="mp-model-controls">
-          {efforts.length > 0 ? (
-            <span className="mp-model-controls-label">{t("modelPicker.thinking")}</span>
-          ) : null}
-          <div className="mp-model-option-pills">
-            {efforts.map((opt) => {
-              const active = opt.reasoningEffort === selectedEffort;
-              return (
-                <button
-                  key={opt.reasoningEffort}
-                  type="button"
-                  className={`mp-model-option-pill${active ? " mp-model-option-pill-active" : ""}`}
-                  onClick={() => onEffortChange(opt.reasoningEffort)}
-                  title={opt.description}
-                >
-                  {effortDisplayLabel(t, opt.reasoningEffort)}
-                </button>
-                );
-              })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

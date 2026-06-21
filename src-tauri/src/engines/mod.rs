@@ -504,6 +504,11 @@ impl EngineManager {
     }
 
     pub async fn list_engines(&self) -> anyhow::Result<Vec<EngineInfoDto>> {
+        // 确保 .env 已加载，使 provider_registry() 能正确检查环境变量凭据
+        if let Ok(cwd) = std::env::current_dir() {
+            panes_agent::infrastructure::env_files::load_dotenv_for_dir(&cwd);
+        }
+
         let codex_models = match timeout(Duration::from_secs(4), self.codex.list_models_runtime())
             .await
         {
@@ -667,6 +672,33 @@ impl EngineManager {
 
     pub async fn list_codex_skills(&self, cwd: &str) -> anyhow::Result<Vec<CodexSkillDto>> {
         self.codex.list_skills(cwd).await
+    }
+
+    pub async fn list_native_skills(&self, cwd: &str) -> anyhow::Result<Vec<CodexSkillDto>> {
+        let root = std::path::Path::new(cwd);
+        let mut skills = panes_agent::infrastructure::skills::discover_skills(root)
+            .into_iter()
+            .map(|skill| CodexSkillDto {
+                name: skill.name,
+                path: skill.path,
+                description: skill.description.unwrap_or_default(),
+                enabled: true,
+                scope: match skill.source {
+                    panes_agent::domain::skills::SkillSource::User => "user".to_string(),
+                    panes_agent::domain::skills::SkillSource::Workspace => "workspace".to_string(),
+                    panes_agent::domain::skills::SkillSource::Plugin { plugin_id } => {
+                        format!("plugin:{plugin_id}")
+                    }
+                },
+            })
+            .collect::<Vec<_>>();
+        skills.sort_by(|left, right| {
+            left.name
+                .to_lowercase()
+                .cmp(&right.name.to_lowercase())
+                .then_with(|| left.path.cmp(&right.path))
+        });
+        Ok(skills)
     }
 
     pub async fn list_codex_apps(&self) -> anyhow::Result<Vec<CodexAppDto>> {
@@ -1090,6 +1122,7 @@ fn map_model_info(model: ModelInfo) -> EngineModelDto {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[test]
     fn claude_capabilities_expose_supported_contract() {
@@ -1127,6 +1160,62 @@ mod tests {
     fn validate_engine_sandbox_mode_rejects_unsupported_claude_full_access() {
         assert!(validate_engine_sandbox_mode("claude", Some("danger-full-access")).is_err());
         assert!(validate_engine_sandbox_mode("claude", Some("workspace-write")).is_ok());
+    }
+
+    #[tokio::test]
+    async fn list_native_skills_loads_workspace_and_plugin_skills() {
+        let root = std::env::temp_dir().join(format!("panes-native-skills-{}", Uuid::new_v4()));
+        let workspace_skill = root.join(".agents/skills/story-design/SKILL.md");
+        let plugin_skill = root.join(".agents/plugins/film-tools/skills/shot-planner/SKILL.md");
+        let plugin_manifest = root.join(".agents/plugins/film-tools/plugin.json");
+
+        std::fs::create_dir_all(workspace_skill.parent().expect("workspace skill parent"))
+            .expect("create workspace skill dir");
+        std::fs::create_dir_all(plugin_skill.parent().expect("plugin skill parent"))
+            .expect("create plugin skill dir");
+        std::fs::write(
+            &workspace_skill,
+            "description: Story design workflow\nUse project story rules.",
+        )
+        .expect("write workspace skill");
+        std::fs::write(
+            &plugin_manifest,
+            r#"{"id":"film-tools","name":"Film Tools","skills":["skills"]}"#,
+        )
+        .expect("write plugin manifest");
+        std::fs::write(
+            &plugin_skill,
+            "description: Shot planning workflow\nCreate shot plans.",
+        )
+        .expect("write plugin skill");
+
+        let skills = EngineManager::new()
+            .list_native_skills(&root.to_string_lossy())
+            .await
+            .expect("native skills should load");
+
+        let story = skills
+            .iter()
+            .find(|skill| skill.name == "story-design")
+            .expect("workspace skill should be listed");
+        assert_eq!(story.description, "Story design workflow");
+        assert!(story.enabled);
+        assert_eq!(story.scope, "workspace");
+        assert!(story.path.ends_with("/.agents/skills/story-design/SKILL.md"));
+
+        let shot = skills
+            .iter()
+            .find(|skill| skill.name == "shot-planner")
+            .expect("plugin skill should be listed");
+        assert_eq!(shot.description, "Shot planning workflow");
+        assert!(shot.enabled);
+        assert_eq!(shot.scope, "plugin:film-tools");
+        assert!(
+            shot.path
+                .ends_with("/.agents/plugins/film-tools/skills/shot-planner/SKILL.md")
+        );
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

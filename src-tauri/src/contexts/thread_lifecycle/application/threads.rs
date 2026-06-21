@@ -2788,6 +2788,7 @@ mod tests {
             db,
             config: Arc::new(AppConfig::default()),
             config_write_lock: Arc::new(tokio::sync::Mutex::new(())),
+            provider_settings_lock: Arc::new(tokio::sync::Mutex::new(())),
             engines: Arc::new(EngineManager::new()),
             git_watchers: Arc::new(GitWatcherManager::default()),
             terminals: Arc::new(TerminalManager::default()),

@@ -73,6 +73,7 @@ import {
 } from "../shared/DiffViewer";
 import MarkdownContent from "./MarkdownContent";
 import { AttachmentChip } from "./AttachmentChip";
+import { getCueLightToolLabel } from "./nativeCueLightSlashCommands";
 import {
   extractTextLinkMatches,
   getWorkspacePaneLeafIdFromEventTarget,
@@ -608,12 +609,18 @@ function ActionStatusBadge({ status }: { status: string }) {
 }
 
 export function getActionBlockDisplayText(
-  block: Pick<ActionBlock, "summary" | "displayLabel" | "displaySubtitle">,
+  block: Pick<ActionBlock, "summary" | "displayLabel" | "displaySubtitle"> &
+    Partial<Pick<ActionBlock, "actionType">>,
 ): { label: string; subtitle: string | null } {
+  const summary = typeof block.summary === "string" ? block.summary : "";
+  const summaryToolName = summary.trim().split(/\s+/, 1)[0] ?? "";
+  const cueLightLabel =
+    getCueLightToolLabel(summaryToolName) ??
+    (typeof block.actionType === "string" ? getCueLightToolLabel(block.actionType) : null);
   const label =
     typeof block.displayLabel === "string" && block.displayLabel.trim()
       ? block.displayLabel.trim()
-      : block.summary;
+      : cueLightLabel ?? summary;
   const subtitle =
     typeof block.displaySubtitle === "string" && block.displaySubtitle.trim()
       ? block.displaySubtitle.trim()

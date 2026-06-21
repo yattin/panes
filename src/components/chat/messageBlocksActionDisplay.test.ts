@@ -15,18 +15,27 @@ describe("getActionBlockDisplayText", () => {
     });
   });
 
-  it("falls back to summary for older action blocks", () => {
+  it("maps older CueLight action blocks to Chinese labels", () => {
     expect(
       getActionBlockDisplayText({
-        summary: "cuelight_create_character 田雨",
+        summary: "cuelight_get_visual_bible",
       }),
     ).toEqual({
-      label: "cuelight_create_character 田雨",
+      label: "读取视觉设计",
+      subtitle: null,
+    });
+
+    expect(
+      getActionBlockDisplayText({
+        summary: "cuelight_update_visual_bible",
+      }),
+    ).toEqual({
+      label: "更新视觉设计",
       subtitle: null,
     });
   });
 
-  it("ignores blank display fields", () => {
+  it("falls back to summary for non-CueLight action blocks and ignores blank display fields", () => {
     expect(
       getActionBlockDisplayText({
         summary: "search path",

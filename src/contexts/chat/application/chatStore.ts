@@ -69,6 +69,7 @@ interface ChatState {
       attachments?: ChatAttachment[];
       inputItems?: ChatInputItem[];
       planMode?: boolean;
+      displayMessage?: string;
     },
   ) => Promise<boolean>;
   steer: (
@@ -78,6 +79,7 @@ interface ChatState {
       attachments?: ChatAttachment[];
       inputItems?: ChatInputItem[];
       planMode?: boolean;
+      displayMessage?: string;
     },
   ) => Promise<boolean>;
   cancel: () => Promise<void>;
@@ -476,7 +478,8 @@ function applyStreamEvent(messages: Message[], event: StreamEvent, threadId: str
       outputChunks: [],
       outputDeferred: false,
       outputDeferredLoaded: true,
-      status: "running"
+      status: "running",
+      startedAt: getChatGateway().wallClockNow()
     });
   }
 
@@ -563,6 +566,13 @@ function applyStreamEvent(messages: Message[], event: StreamEvent, threadId: str
     const actionId = String(event.action_id ?? "");
     assistant.blocks = patchActionBlock(blocks, actionId, (block) => {
       const result = (event.result as Record<string, unknown> | undefined) ?? {};
+      const rawDurationMs = Number(result.durationMs ?? result.duration_ms ?? 0);
+      const fallbackDurationMs =
+        rawDurationMs > 0
+          ? rawDurationMs
+          : block.startedAt != null
+            ? Math.max(1, Math.round(getChatGateway().wallClockNow() - block.startedAt))
+            : undefined;
       return {
         ...block,
         status: result.success ? "done" : "error",
@@ -571,7 +581,7 @@ function applyStreamEvent(messages: Message[], event: StreamEvent, threadId: str
           output: result.output as string | undefined,
           error: result.error as string | undefined,
           diff: result.diff as string | undefined,
-          durationMs: Number(result.durationMs ?? result.duration_ms ?? 0)
+          durationMs: fallbackDurationMs
         }
       };
     });
@@ -1122,7 +1132,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const attachments = options?.attachments ?? [];
     const inputItems = options?.inputItems ?? [];
     const planMode = options?.planMode ?? false;
-    const userMessage = createOptimisticUserMessage(threadId, message, {
+    const displayMessageOverride = options?.displayMessage ?? null;
+    const visibleMessage = displayMessageOverride ?? message;
+    const userMessage = createOptimisticUserMessage(threadId, visibleMessage, {
       attachments,
       inputItems,
       planMode,
@@ -1154,6 +1166,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         inputItems.length > 0 ? inputItems : null,
         planMode,
         clientTurnId,
+        displayMessageOverride,
       );
       return true;
     } catch (error) {
@@ -1190,7 +1203,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const attachments = options?.attachments ?? [];
     const inputItems = options?.inputItems ?? [];
     const planMode = options?.planMode ?? false;
-    const steerBlock = createSteerBlock(message, {
+    const steerBlock = createSteerBlock(options?.displayMessage ?? message, {
       attachments,
       inputItems,
       planMode,
@@ -1210,6 +1223,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         attachments.length > 0 ? attachments : null,
         inputItems.length > 0 ? inputItems : null,
         planMode,
+        options?.displayMessage ?? null,
       );
       return true;
     } catch (error) {

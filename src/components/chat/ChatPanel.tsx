@@ -41,6 +41,7 @@ import {
   Eye,
   Compass,
   BookOpen,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -54,13 +55,19 @@ import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useGitStore } from "../../stores/gitStore";
 import { useTerminalStore, type LayoutMode } from "../../stores/terminalStore";
 import { toast } from "../../stores/toastStore";
-import { isClaudeFamilyEngine } from "../../contexts/chat/domain/chatEngineIds";
+import { isClaudeFamilyEngine, normalizeEngineId } from "../../contexts/chat/domain/chatEngineIds";
 import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 import { resolvePreferredOnboardingChatSelection } from "../../contexts/onboarding/domain/onboardingFlow";
 import { isMacDesktop, usesCustomWindowFrame } from "../../contexts/shell-ui/application/windowActions";
 import { MessageBlocks, shouldShowClaudeUnsupportedApproval } from "./MessageBlocks";
 import { resolveEngineCapabilities } from "./engineCapabilities";
 import { buildCodexInputItems } from "./codexInputItems";
+import {
+  compileCueLightCommandDisplayPrompt,
+  compileCueLightCommandPrompt,
+  nativeCueLightCommandId,
+  nativeCueLightSlashCommands,
+} from "./nativeCueLightSlashCommands";
 import {
   getPlanImplementationCodingMessage,
   shouldPromptToImplementPlan,
@@ -256,6 +263,10 @@ const MODEL_TOKEN_LABELS: Record<string, string> = {
   mini: "Mini",
   nano: "Nano",
 };
+
+function isNativeChatEngineId(engineId?: string | null): boolean {
+  return normalizeEngineId(engineId ?? "") === "claurst-native";
+}
 
 type CodexThreadApprovalPolicyValue =
   | "inherit"
@@ -1572,7 +1583,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   const [planMode, setPlanMode] = useState(false);
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const [slashMenuQuery, setSlashMenuQuery] = useState("");
+  const [slashMenuTrigger, setSlashMenuTrigger] = useState<"/" | "$">("/");
   const [slashMenuActiveIndex, setSlashMenuActiveIndex] = useState(0);
+  const [selectedCueLightCommandId, setSelectedCueLightCommandId] = useState<string | null>(null);
   const [activeCommandPanel, setActiveCommandPanel] = useState<ActiveSlashCommand | null>(null);
   const [commandPanelBusy, setCommandPanelBusy] = useState(false);
   const [commandPanelError, setCommandPanelError] = useState<string | null>(null);
@@ -1585,6 +1598,8 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   const selectedEffortRef = useRef(selectedEffort);
   const [codexSkills, setCodexSkills] = useState<CodexSkill[]>([]);
   const [codexApps, setCodexApps] = useState<CodexApp[]>([]);
+  const [nativeSkills, setNativeSkills] = useState<CodexSkill[]>([]);
+  const [nativeSkillsLoaded, setNativeSkillsLoaded] = useState(false);
   const [codexReferenceCatalogState, setCodexReferenceCatalogState] =
     useState<CodexReferenceCatalogState>({
       skillsLoaded: false,
@@ -1744,6 +1759,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     threadId: string;
     threadPaths: string[];
     text: string;
+    displayText: string;
     attachments: ChatAttachment[];
     inputItems: ChatInputItem[] | null;
     planMode: boolean;
@@ -1755,6 +1771,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     outputSchemaText: string;
     customApprovalPolicyText: string;
     openCodeAgent: string;
+    inputDraft: string;
+    cueLightCommandId: string | null;
+    historyText: string;
     restorePlanModeOnCancel: boolean;
   } | null>(null);
   const [planImplementationPrompt, setPlanImplementationPrompt] = useState<{
@@ -1886,6 +1905,12 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   }, [planMode, selectedEngineId]);
 
   useEffect(() => {
+    if (!isNativeChatEngineId(selectedEngineId)) {
+      setSelectedCueLightCommandId(null);
+    }
+  }, [selectedEngineId]);
+
+  useEffect(() => {
     selectedModelIdRef.current = selectedModelId;
   }, [selectedModelId]);
 
@@ -1988,8 +2013,20 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
   const resolveCodexInputItems = useCallback(
     async (message: string, engineId: string): Promise<ChatInputItem[] | undefined> => {
-      if (engineId !== "codex") {
+      if (engineId !== "codex" && !isNativeChatEngineId(engineId)) {
         return undefined;
+      }
+
+      if (isNativeChatEngineId(engineId)) {
+        let skills = nativeSkills;
+        let skillsLoaded = nativeSkillsLoaded;
+        if (!skillsLoaded && message.includes("$") && codexReferenceRoot) {
+          skills = await getChatGateway().listNativeSkills(codexReferenceRoot);
+          skillsLoaded = true;
+          setNativeSkills(skills);
+          setNativeSkillsLoaded(true);
+        }
+        return buildCodexInputItems(message, skills, []);
       }
 
       let skills = codexSkills;
@@ -2018,10 +2055,13 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     },
     [
       codexApps,
+      codexReferenceRoot,
       codexReferenceCatalogState.appsLoaded,
       codexReferenceCatalogState.skillsLoaded,
       codexSkills,
       loadCodexReferenceCatalogs,
+      nativeSkills,
+      nativeSkillsLoaded,
     ],
   );
 
@@ -2834,6 +2874,36 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
   }, [activeWorkspaceId, codexReferenceRoot, loadCodexReferenceCatalogs, selectedEngineId]);
 
   useEffect(() => {
+    if (!isNativeChatEngineId(selectedEngineId) || !activeWorkspaceId || !codexReferenceRoot) {
+      setNativeSkills([]);
+      setNativeSkillsLoaded(false);
+      return;
+    }
+
+    let disposed = false;
+    setNativeSkills([]);
+    setNativeSkillsLoaded(false);
+    void getChatGateway()
+      .listNativeSkills(codexReferenceRoot)
+      .then((skills) => {
+        if (disposed) {
+          return;
+        }
+        setNativeSkills(skills);
+        setNativeSkillsLoaded(true);
+      })
+      .catch(() => {
+        if (!disposed) {
+          setNativeSkillsLoaded(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeWorkspaceId, codexReferenceRoot, selectedEngineId]);
+
+  useEffect(() => {
     if (selectedEngineId !== "opencode" || !activeWorkspaceId || !openCodeRuntimeRoot) {
       setOpenCodeCatalog(null);
       setOpenCodeCatalogLoaded(false);
@@ -3019,11 +3089,12 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
     lastSyncedThreadIdRef.current = activeThread.id;
     manuallyOverrodeThreadSelectionRef.current = false;
     setHasExplicitComposerRuntime(false);
-    if (activeThread.engineId !== selectedEngineId) {
-      setSelectedEngineId(activeThread.engineId);
+    const normalizedThreadEngineId = normalizeEngineId(activeThread.engineId);
+    if (normalizedThreadEngineId !== selectedEngineId) {
+      setSelectedEngineId(normalizedThreadEngineId);
     }
     const threadEngine =
-      engines.find((engine) => engine.id === activeThread.engineId) ?? null;
+      engines.find((engine) => engine.id === normalizedThreadEngineId) ?? null;
     const lastModelId =
       typeof activeThread.engineMetadata?.lastModelId === "string"
         ? activeThread.engineMetadata.lastModelId
@@ -3610,134 +3681,253 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
   const isCodexEngine = selectedEngineId === "codex";
   const isOpenCodeEngine = selectedEngineId === "opencode";
+  const isNativeEngine = isNativeChatEngineId(selectedEngineId);
   const activePlanMode = planMode && !isOpenCodeEngine;
 
+  const nativeCueLightCommands = useMemo<SlashCommand[]>(
+    () =>
+      isNativeEngine
+        ? nativeCueLightSlashCommands.map((command) => ({
+            id: nativeCueLightCommandId(command.id),
+            name: command.label,
+            description: command.description,
+            icon: command.icon,
+            disabled: false,
+          }))
+        : [],
+    [isNativeEngine],
+  );
+
   const slashCommands: SlashCommand[] = useMemo(
-    () => [
-      ...[
-        {
-          id: "review",
-          name: "review",
-          description: t("reviewPicker.subtitle"),
-          icon: Search,
-          codexOnly: true,
-          disabled: !canManageActiveCodexThread,
-        },
-        {
-          id: "fork",
-          name: "fork",
-          description: t("threadPicker.forkDescription"),
-          icon: GitBranch,
-          codexOnly: true,
-          disabled: !canUseNativeCodexHistoryTools,
-        },
-        {
-          id: "rollback",
-          name: "rollback",
-          description: t("threadPicker.rollbackDescription"),
-          icon: RotateCcw,
-          codexOnly: true,
-          disabled: !canUseNativeCodexHistoryTools,
-        },
-        {
-          id: "compact",
-          name: "compact",
-          description: t("threadPicker.compactDescription"),
-          icon: Scissors,
-          codexOnly: true,
-          disabled: !canManageActiveCodexThread,
-        },
-        {
-          id: "fast",
-          name: "fast",
-          description: t("configPicker.serviceTierDescription"),
-          icon: Zap,
-          codexOnly: true,
-          disabled: !isCodexEngine,
-        },
-        {
-          id: "personality",
-          name: "personality",
-          description: t("configPicker.personalityDescription"),
-          icon: UserCircle,
-          codexOnly: true,
-          disabled: !isCodexEngine,
-        },
-        {
-          id: "skills",
-          name: "skills",
-          description: t("slashCommands.panels.skills.description"),
-          icon: Sparkles,
-          codexOnly: true,
-          disabled: !isCodexEngine,
-        },
-        {
-          id: "mcp",
-          name: "MCP",
-          description: t("slashCommands.panels.mcp.description"),
-          icon: Server,
-          codexOnly: isCodexEngine,
-          disabled: !(isCodexEngine || isOpenCodeEngine),
-        },
-        {
-          id: "experimental",
-          name: "experimental",
-          description: t("slashCommands.panels.experimental.description"),
-          icon: FlaskConical,
-          codexOnly: true,
-          disabled: !isCodexEngine,
-        },
-        {
-          id: "agents",
-          name: "agents",
-          description: t("slashCommands.panels.openCodeAgents.description"),
-          icon: UserCircle,
-          disabled: !isOpenCodeEngine,
-        },
-        {
-          id: "commands",
-          name: "commands",
-          description: t("slashCommands.panels.openCodeCommands.description"),
-          icon: SquareCode,
-          disabled: !isOpenCodeEngine,
-        },
-        {
-          id: "sessions",
-          name: "sessions",
-          description: t("slashCommands.panels.openCodeSessions.description"),
-          icon: GitBranch,
-          disabled: !isOpenCodeEngine,
-        },
-      ],
-      ...openCodeSlashCommands,
-    ],
+    () => {
+      if (isNativeEngine) {
+        return nativeCueLightCommands;
+      }
+
+      return [
+        ...[
+          {
+            id: "review",
+            name: "review",
+            description: t("reviewPicker.subtitle"),
+            icon: Search,
+            codexOnly: true,
+            disabled: !canManageActiveCodexThread,
+          },
+          {
+            id: "fork",
+            name: "fork",
+            description: t("threadPicker.forkDescription"),
+            icon: GitBranch,
+            codexOnly: true,
+            disabled: !canUseNativeCodexHistoryTools,
+          },
+          {
+            id: "rollback",
+            name: "rollback",
+            description: t("threadPicker.rollbackDescription"),
+            icon: RotateCcw,
+            codexOnly: true,
+            disabled: !canUseNativeCodexHistoryTools,
+          },
+          {
+            id: "compact",
+            name: "compact",
+            description: t("threadPicker.compactDescription"),
+            icon: Scissors,
+            codexOnly: true,
+            disabled: !canManageActiveCodexThread,
+          },
+          {
+            id: "fast",
+            name: "fast",
+            description: t("configPicker.serviceTierDescription"),
+            icon: Zap,
+            codexOnly: true,
+            disabled: !isCodexEngine,
+          },
+          {
+            id: "personality",
+            name: "personality",
+            description: t("configPicker.personalityDescription"),
+            icon: UserCircle,
+            codexOnly: true,
+            disabled: !isCodexEngine,
+          },
+          {
+            id: "skills",
+            name: "skills",
+            description: t("slashCommands.panels.skills.description"),
+            icon: Sparkles,
+            codexOnly: true,
+            disabled: !isCodexEngine,
+          },
+          {
+            id: "mcp",
+            name: "MCP",
+            description: t("slashCommands.panels.mcp.description"),
+            icon: Server,
+            codexOnly: isCodexEngine,
+            disabled: !(isCodexEngine || isOpenCodeEngine),
+          },
+          {
+            id: "experimental",
+            name: "experimental",
+            description: t("slashCommands.panels.experimental.description"),
+            icon: FlaskConical,
+            codexOnly: true,
+            disabled: !isCodexEngine,
+          },
+          {
+            id: "agents",
+            name: "agents",
+            description: t("slashCommands.panels.openCodeAgents.description"),
+            icon: UserCircle,
+            disabled: !isOpenCodeEngine,
+          },
+          {
+            id: "commands",
+            name: "commands",
+            description: t("slashCommands.panels.openCodeCommands.description"),
+            icon: SquareCode,
+            disabled: !isOpenCodeEngine,
+          },
+          {
+            id: "sessions",
+            name: "sessions",
+            description: t("slashCommands.panels.openCodeSessions.description"),
+            icon: GitBranch,
+            disabled: !isOpenCodeEngine,
+          },
+        ],
+        ...openCodeSlashCommands,
+      ];
+    },
     [
       canManageActiveCodexThread,
       canUseNativeCodexHistoryTools,
       isCodexEngine,
+      isNativeEngine,
       isOpenCodeEngine,
+      nativeCueLightCommands,
       openCodeSlashCommands,
       t,
     ],
   );
 
+  const referenceCommands = useMemo<SlashCommand[]>(() => {
+    if (isNativeEngine) {
+      return nativeSkills.map((skill) => ({
+        id: `reference-skill:${skill.path}`,
+        name: `$${skill.name}`,
+        description: skill.description || skill.scope,
+        icon: Sparkles,
+      }));
+    }
+
+    if (isCodexEngine) {
+      return [
+        ...codexSkills.map((skill) => ({
+          id: `reference-skill:${skill.path}`,
+          name: `$${skill.name}`,
+          description: skill.description || skill.scope,
+          icon: Sparkles,
+        })),
+        ...codexApps.map((app) => ({
+          id: `reference-app:${app.id}`,
+          name: `$${app.name}`,
+          description: app.description || `app://${app.id}`,
+          icon: Server,
+        })),
+      ];
+    }
+
+    return [];
+  }, [codexApps, codexSkills, isCodexEngine, isNativeEngine, nativeSkills]);
+
+  const symbolMenuCommands = slashMenuTrigger === "$" ? referenceCommands : slashCommands;
+  const selectedCueLightCommand = useMemo(
+    () =>
+      selectedCueLightCommandId
+        ? nativeCueLightSlashCommands.find((command) => command.id === selectedCueLightCommandId) ?? null
+        : null,
+    [selectedCueLightCommandId],
+  );
+  const hasSubmittableInput =
+    input.trim().length > 0 ||
+    attachments.length > 0 ||
+    Boolean(selectedCueLightCommand);
+
   const filteredSlashCommands = useMemo(() => {
-    if (!slashMenuQuery) return slashCommands;
+    if (!slashMenuQuery) return symbolMenuCommands;
     const q = slashMenuQuery.toLowerCase();
-    return slashCommands.filter(
+    return symbolMenuCommands.filter(
       (c) =>
-        c.name.toLowerCase().startsWith(q) ||
-        c.id.startsWith(q) ||
+        c.name.toLowerCase().replace(/^\$/, "").startsWith(q) ||
+        c.id.toLowerCase().includes(q) ||
         c.description.toLowerCase().includes(q),
     );
-  }, [slashCommands, slashMenuQuery]);
+  }, [slashMenuQuery, symbolMenuCommands]);
+
+  function replaceActiveSymbolToken(symbol: "/" | "$", replacement: string) {
+    const element = inputRef.current;
+    const cursorPos = element?.selectionStart ?? input.length;
+    const textBeforeCursor = input.slice(0, cursorPos);
+    const pattern =
+      symbol === "$"
+        ? /(?:^|\s)(\$[A-Za-z0-9._-]*)$/
+        : /(?:^|\s)(\/[^\s]*)$/;
+    const match = pattern.exec(textBeforeCursor);
+    if (!match) {
+      setInput((prev) => `${prev}${replacement}`);
+      return;
+    }
+    const token = match[1] ?? "";
+    const tokenStart = (match.index ?? 0) + match[0].lastIndexOf(token);
+    const nextInput = `${input.slice(0, tokenStart)}${replacement}${input.slice(cursorPos)}`;
+    setInput(nextInput);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      const nextCursor = tokenStart + replacement.length;
+      inputRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
+  function removeActiveSymbolToken(symbol: "/" | "$") {
+    replaceActiveSymbolToken(symbol, "");
+  }
 
   function handleSlashCommandSelect(commandId: string) {
     setSlashMenuOpen(false);
     setSlashMenuQuery("");
 
-    const cmd = slashCommands.find((c) => c.id === commandId);
+    const cmd = symbolMenuCommands.find((c) => c.id === commandId);
     if (!cmd || cmd.disabled) return;
+
+    if (commandId.startsWith("reference-skill:")) {
+      const skill = (isNativeEngine ? nativeSkills : codexSkills).find(
+        (candidate) => `reference-skill:${candidate.path}` === commandId,
+      );
+      if (!skill) return;
+      replaceActiveSymbolToken("$", `$${skill.name} `);
+      return;
+    }
+
+    if (commandId.startsWith("reference-app:")) {
+      const app = codexApps.find((candidate) => `reference-app:${candidate.id}` === commandId);
+      if (!app) return;
+      replaceActiveSymbolToken("$", `$${app.name} `);
+      return;
+    }
+
+    if (commandId.startsWith("native-cuelight:")) {
+      const id = commandId.slice("native-cuelight:".length);
+      const command = nativeCueLightSlashCommands.find((candidate) => candidate.id === id);
+      if (!command) return;
+      removeActiveSymbolToken("/");
+      setSelectedCueLightCommandId(command.id);
+      return;
+    }
 
     if (commandId.startsWith("opencode-command:")) {
       const commandName = commandId.slice("opencode-command:".length);
@@ -3843,9 +4033,19 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
   function handleSlashDetection(value: string, cursorPos: number) {
     const textBeforeCursor = value.slice(0, cursorPos);
-    const slashMatch = /(?:^|\s)(\/([a-z]*))$/.exec(textBeforeCursor);
+    const referenceMatch = /(?:^|\s)(\$([A-Za-z0-9._-]*))$/.exec(textBeforeCursor);
+    if (referenceMatch) {
+      setSlashMenuOpen(true);
+      setSlashMenuTrigger("$");
+      setSlashMenuQuery(referenceMatch[2] ?? "");
+      setSlashMenuActiveIndex(0);
+      return;
+    }
+
+    const slashMatch = /(?:^|\s)(\/([^\s/]*))$/.exec(textBeforeCursor);
     if (slashMatch) {
       setSlashMenuOpen(true);
+      setSlashMenuTrigger("/");
       setSlashMenuQuery(slashMatch[2] ?? "");
       setSlashMenuActiveIndex(0);
     } else if (slashMenuOpen) {
@@ -3855,8 +4055,16 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!input.trim() || !activeWorkspaceId) return;
-    const text = input.trim();
+    if (!hasSubmittableInput || !activeWorkspaceId) return;
+    const inputDraft = input;
+    const trimmedInput = input.trim();
+    const text = selectedCueLightCommand
+      ? compileCueLightCommandPrompt(selectedCueLightCommand, trimmedInput)
+      : trimmedInput;
+    const displayText = selectedCueLightCommand
+      ? compileCueLightCommandDisplayPrompt(selectedCueLightCommand, trimmedInput)
+      : trimmedInput;
+    const historyText = displayText;
     const currentAttachments = [...attachments];
 
     if (streaming) {
@@ -3875,19 +4083,20 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
         attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
         inputItems,
         planMode,
+        displayMessage: displayText,
       });
       if (steered) {
-        const trimmed = input.trim();
-        if (trimmed) {
+        if (historyText) {
           const hist = inputHistoryRef.current;
-          if (hist[0] !== trimmed) {
-            inputHistoryRef.current = [trimmed, ...hist].slice(0, 50);
+          if (hist[0] !== historyText) {
+            inputHistoryRef.current = [historyText, ...hist].slice(0, 50);
           }
         }
         inputHistCursorRef.current = -1;
         inputLiveDraftRef.current = "";
         setInput("");
         setAttachments([]);
+        setSelectedCueLightCommandId(null);
       }
       return;
     }
@@ -3979,6 +4188,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
           threadId: targetThreadId,
           threadPaths: availableRepoPaths,
           text,
+          displayText,
           attachments: [...attachments],
           inputItems: inputItems ?? null,
           planMode: submitPlanMode,
@@ -3990,6 +4200,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
           outputSchemaText,
           customApprovalPolicyText,
           openCodeAgent: selectedOpenCodeAgentRef.current,
+          inputDraft,
+          cueLightCommandId: selectedCueLightCommand?.id ?? null,
+          historyText,
           restorePlanModeOnCancel: false,
         });
         return;
@@ -4018,20 +4231,21 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
       inputItems,
       planMode: submitPlanMode,
+      displayMessage: displayText,
     });
     if (sent) {
       pendingPlanImplementationThreadIdRef.current = submitPlanMode ? targetThreadId : null;
-      const trimmed = input.trim();
-      if (trimmed) {
+      if (historyText) {
         const hist = inputHistoryRef.current;
-        if (hist[0] !== trimmed) {
-          inputHistoryRef.current = [trimmed, ...hist].slice(0, 50);
+        if (hist[0] !== historyText) {
+          inputHistoryRef.current = [historyText, ...hist].slice(0, 50);
         }
       }
       inputHistCursorRef.current = -1;
       inputLiveDraftRef.current = "";
       setInput("");
       setAttachments([]);
+      setSelectedCueLightCommandId(null);
     }
   }
 
@@ -4052,16 +4266,18 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
         outputSchemaText: prompt.outputSchemaText,
         customApprovalPolicyText: prompt.customApprovalPolicyText,
       }))) {
-        setInput(prompt.text);
+        setInput(prompt.inputDraft);
         setAttachments(prompt.attachments);
+        setSelectedCueLightCommandId(prompt.cueLightCommandId);
         return;
       }
       if (!(await applyOpenCodeConfigToThread(prompt.threadId, {
         engineId: prompt.engineId,
         agent: prompt.openCodeAgent,
       }))) {
-        setInput(prompt.text);
+        setInput(prompt.inputDraft);
         setAttachments(prompt.attachments);
+        setSelectedCueLightCommandId(prompt.cueLightCommandId);
         return;
       }
       setThreadLastModelLocal(prompt.threadId, prompt.modelId);
@@ -4075,21 +4291,31 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
         attachments: prompt.attachments.length > 0 ? prompt.attachments : undefined,
         inputItems: prompt.inputItems ?? undefined,
         planMode: promptPlanMode,
+        displayMessage: prompt.displayText,
       });
       if (!sent) {
-        setInput(prompt.text);
+        setInput(prompt.inputDraft);
         setAttachments(prompt.attachments);
+        setSelectedCueLightCommandId(prompt.cueLightCommandId);
         return;
       }
 
       pendingPlanImplementationThreadIdRef.current = promptPlanMode ? prompt.threadId : null;
+      if (prompt.historyText) {
+        const hist = inputHistoryRef.current;
+        if (hist[0] !== prompt.historyText) {
+          inputHistoryRef.current = [prompt.historyText, ...hist].slice(0, 50);
+        }
+      }
       setInput("");
       setAttachments([]);
+      setSelectedCueLightCommandId(null);
 
       await refreshThreads(prompt.workspaceId);
     } catch {
-      setInput(prompt.text);
+      setInput(prompt.inputDraft);
       setAttachments(prompt.attachments);
+      setSelectedCueLightCommandId(prompt.cueLightCommandId);
     }
   }
 
@@ -4129,6 +4355,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
           threadId: currentThread.id,
           threadPaths: availableRepoPaths,
           text: implementationMessage,
+          displayText: implementationMessage,
           attachments: [],
           inputItems: null,
           planMode: false,
@@ -4140,6 +4367,9 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
           outputSchemaText: prompt.outputSchemaText,
           customApprovalPolicyText: prompt.customApprovalPolicyText,
           openCodeAgent: prompt.openCodeAgent,
+          inputDraft: implementationMessage,
+          cueLightCommandId: null,
+          historyText: implementationMessage,
           restorePlanModeOnCancel: true,
         });
         return;
@@ -5141,18 +5371,14 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
             {/* ── Input Area ── */}
             <div
+              className="chat-input-area"
               style={{
-                padding: "8px 14px 10px",
                 borderTop: "1px solid var(--border)",
               }}
             >
         <form
           onSubmit={onSubmit}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
+          className="chat-input-form"
         >
           {/* Pending approvals */}
           {pendingApprovalBannerRows.length > 0 && (
@@ -5474,9 +5700,32 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
                   </div>
                 )}
 
-                {/* Attachment chips */}
-                {attachments.length > 0 && (
+                {/* Command and attachment chips */}
+                {(selectedCueLightCommand || attachments.length > 0) && (
                   <div className="chat-attachments-bar">
+                    {selectedCueLightCommand && (
+                      <div
+                        className="chat-cuelight-command-chip"
+                        title={selectedCueLightCommand.description}
+                      >
+                        {(() => {
+                          const Icon = selectedCueLightCommand.icon;
+                          return <Icon size={12} />;
+                        })()}
+                        <span className="chat-cuelight-command-chip-name">
+                          {selectedCueLightCommand.label}
+                        </span>
+                        <button
+                          type="button"
+                          className="chat-cuelight-command-chip-remove"
+                          onClick={() => setSelectedCueLightCommandId(null)}
+                          aria-label="移除 CueLight 命令"
+                          title="移除 CueLight 命令"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    )}
                     {attachments.map((attachment) => {
                       return (
                         <AttachmentChip
@@ -5536,6 +5785,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
                 <textarea
                   ref={inputRef}
+                  className="chat-input-textarea"
                   rows={3}
                   value={input}
                   onChange={(e) => {
@@ -5630,14 +5880,6 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
                   }
                   disabled={!activeWorkspaceId}
                   style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    background: "transparent",
-                    color: "var(--text-1)",
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    resize: "none",
-                    fontFamily: "inherit",
                     caretColor: activePlanMode ? "var(--accent-2)" : "var(--accent)",
                   }}
                 />
@@ -5658,12 +5900,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
 
             {/* Input toolbar with selectors */}
             <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "6px 10px",
-                gap: 6,
-              }}
+              className="chat-input-toolbar"
             >
               {/* Attach file button */}
               {!showSpecialInputComposer && (
@@ -5923,7 +6160,7 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
                 {(!streaming || canSteerActiveTurn) && !showSpecialInputComposer && (
                 <button
                   type="submit"
-                  disabled={!activeWorkspaceId || !input.trim()}
+                  disabled={!activeWorkspaceId || !hasSubmittableInput}
                   title={streaming ? t("panel.sendFollowUp") : undefined}
                   aria-label={streaming ? t("panel.sendFollowUp") : undefined}
                   style={{
@@ -5931,20 +6168,20 @@ export function ChatPanel({ embedded = false }: ChatPanelProps = {}) {
                     height: 30,
                     borderRadius: "50%",
                     background:
-                      activeWorkspaceId && input.trim()
+                      activeWorkspaceId && hasSubmittableInput
                         ? "var(--accent)"
                         : "var(--bg-4)",
                     color:
-                      activeWorkspaceId && input.trim()
+                      activeWorkspaceId && hasSubmittableInput
                         ? "var(--bg-0)"
                         : "var(--text-3)",
-                    cursor: activeWorkspaceId && input.trim() ? "pointer" : "default",
+                    cursor: activeWorkspaceId && hasSubmittableInput ? "pointer" : "default",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     transition: "all var(--duration-fast) var(--ease-out)",
                     boxShadow:
-                      activeWorkspaceId && input.trim()
+                      activeWorkspaceId && hasSubmittableInput
                         ? "var(--accent-glow)"
                         : "none",
                   }}

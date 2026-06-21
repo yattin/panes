@@ -13,6 +13,7 @@ const mockIpc = vi.hoisted(() => ({
   listCodexRemoteThreads: vi.fn(),
   listOpenCodeRemoteSessions: vi.fn(),
   listCodexSkills: vi.fn(),
+  listNativeSkills: vi.fn(),
   prewarmEngine: vi.fn(),
   readAttachmentPreview: vi.fn(),
   respondApproval: vi.fn(),
@@ -138,16 +139,20 @@ describe("chatRepository", () => {
 
   it("loads Codex references and prewarms engines through the native chat adapter", async () => {
     const skills = [{ name: "skill-1" }];
+    const nativeSkills = [{ name: "native-skill-1" }];
     const apps = [{ id: "app-1" }];
     mockIpc.listCodexSkills.mockResolvedValue(skills);
+    mockIpc.listNativeSkills.mockResolvedValue(nativeSkills);
     mockIpc.listCodexApps.mockResolvedValue(apps);
     mockIpc.prewarmEngine.mockResolvedValue(undefined);
 
     await expect(chatRepository.listCodexSkills("C:/repo")).resolves.toBe(skills);
+    await expect(chatRepository.listNativeSkills("C:/repo")).resolves.toBe(nativeSkills);
     await expect(chatRepository.listCodexApps()).resolves.toBe(apps);
     await expect(chatRepository.prewarmEngine("codex")).resolves.toBeUndefined();
 
     expect(mockIpc.listCodexSkills).toHaveBeenCalledWith("C:/repo");
+    expect(mockIpc.listNativeSkills).toHaveBeenCalledWith("C:/repo");
     expect(mockIpc.listCodexApps).toHaveBeenCalledWith();
     expect(mockIpc.prewarmEngine).toHaveBeenCalledWith("codex");
   });

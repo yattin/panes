@@ -940,6 +940,23 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
             </button>
             <div className="git-action-menu-divider" />
 
+            {/* ── Workspace ── */}
+            <button
+              type="button"
+              className="git-action-menu-item"
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+              onClick={() => {
+                closeSettingsMenu();
+                if (activeWorkspaceId) {
+                  openWorkspaceSettings(activeWorkspaceId);
+                }
+              }}
+            >
+              <Settings size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+              {t("app:sidebar.workspaceSettings", { defaultValue: "Workspace Settings" })}
+            </button>
+            <div className="git-action-menu-divider" />
+
             {/* ── Actions ── */}
             <button
               type="button"

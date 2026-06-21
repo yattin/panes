@@ -143,7 +143,7 @@ fn build_cuelight_openai_tool_definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "cuelight_get_story_bible",
-                "description": "读取项目剧本圣经（worldView 等核心故事设定）",
+                "description": "读取项目故事设计（worldView 等核心故事设定）",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -155,7 +155,7 @@ fn build_cuelight_openai_tool_definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "cuelight_update_story_bible",
-                "description": "更新项目剧本圣经字段。只写入传入字段，不从原文文件伪造项目状态。",
+                "description": "更新项目故事设计字段。只写入传入字段，不从原文文件伪造项目状态。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -172,7 +172,7 @@ fn build_cuelight_openai_tool_definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "cuelight_get_visual_bible",
-                "description": "读取项目视觉圣经/风格相关字段",
+                "description": "读取项目视觉设计/风格相关字段",
                 "parameters": {
                     "type": "object",
                     "properties": {},
@@ -184,7 +184,7 @@ fn build_cuelight_openai_tool_definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "cuelight_update_visual_bible",
-                "description": "更新项目视觉圣经/风格字段",
+                "description": "更新项目视觉设计/风格字段",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1698,8 +1698,8 @@ pub fn build_cuelight_system_prompt_appendix(ctx: &CueLightThreadContext) -> Str
 ## CueLight 可用工具
 你拥有以下 CueLight 影视制作工具：
 - `cuelight_project_status`：查看项目完整状态和进度
-- `cuelight_get_story_bible` / `cuelight_update_story_bible`：读取或更新剧本圣经
-- `cuelight_get_visual_bible` / `cuelight_update_visual_bible`：读取或更新视觉圣经/风格字段
+- `cuelight_get_story_bible` / `cuelight_update_story_bible`：读取或更新故事设计
+- `cuelight_get_visual_bible` / `cuelight_update_visual_bible`：读取或更新视觉设计/风格字段
 - `cuelight_list_characters` / `cuelight_get_character` / `cuelight_create_character` / `cuelight_update_character` / `cuelight_delete_character`：读写角色
 - `cuelight_list_scenes` / `cuelight_get_scene` / `cuelight_create_scene` / `cuelight_update_scene` / `cuelight_delete_scene`：读写场景
 - `cuelight_list_props` / `cuelight_get_prop` / `cuelight_create_prop` / `cuelight_update_prop` / `cuelight_delete_prop`：读写道具

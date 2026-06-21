@@ -346,6 +346,8 @@ export const ipc = {
   getContextMaxTokens: () => invoke<number>("get_context_max_tokens"),
   listCodexSkills: (cwd: string) =>
     invoke<CodexSkill[]>("list_codex_skills", { cwd }),
+  listNativeSkills: (cwd: string) =>
+    invoke<CodexSkill[]>("list_native_skills", { cwd }),
   listCodexApps: () => invoke<CodexApp[]>("list_codex_apps"),
   getOpenCodeRuntimeCatalog: (cwd: string) =>
     invoke<OpenCodeRuntimeCatalog>("get_opencode_runtime_catalog", { cwd }),
@@ -369,10 +371,12 @@ export const ipc = {
     inputItems?: ChatInputItem[] | null,
     planMode?: boolean | null,
     clientTurnId?: string | null,
+    displayMessage?: string | null,
   ) =>
     invoke<string>("send_message", {
       threadId,
       message,
+      displayMessage: displayMessage ?? null,
       modelId: modelId ?? null,
       reasoningEffort: reasoningEffort ?? null,
       attachments: attachments ?? null,
@@ -386,10 +390,12 @@ export const ipc = {
     attachments?: ChatAttachment[] | null,
     inputItems?: ChatInputItem[] | null,
     planMode?: boolean | null,
+    displayMessage?: string | null,
   ) =>
     invoke<void>("steer_message", {
       threadId,
       message,
+      displayMessage: displayMessage ?? null,
       attachments: attachments ?? null,
       inputItems: inputItems ?? null,
       planMode: planMode ?? null,
@@ -813,5 +819,40 @@ export async function writeCommandToNewSession(
         unlisten = fn;
       }
     });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Provider configuration
+// ---------------------------------------------------------------------------
+
+export interface ProviderConfigEntry {
+  enabled: boolean;
+  api_key?: string | null;
+  api_base?: string | null;
+  models?: Record<string, boolean>;
+}
+
+export interface ProviderSettings {
+  providers: Record<string, ProviderConfigEntry>;
+}
+
+export async function getProviderSettings(): Promise<ProviderSettings> {
+  return invoke<ProviderSettings>("get_provider_settings");
+}
+
+export async function setProviderConfig(
+  providerId: string,
+  enabled: boolean,
+  apiKey?: string | null,
+  apiBase?: string | null,
+  models?: Record<string, boolean> | null,
+): Promise<void> {
+  return invoke<void>("set_provider_config", {
+    providerId,
+    enabled,
+    apiKey: apiKey ?? null,
+    apiBase: apiBase ?? null,
+    models: models ?? null,
   });
 }

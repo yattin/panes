@@ -8,6 +8,7 @@ import {
   FolderOpen,
   GitBranch,
   Info,
+  Key,
   Link,
   Play,
   RefreshCw,
@@ -22,9 +23,10 @@ import { Dropdown } from "../shared/Dropdown";
 import { WorkspaceStartupSection } from "./WorkspaceStartupSection";
 import { GitRemotesView } from "../git/GitRemotesView";
 import { CueLightProjectPicker } from "../cuelight/CueLightProjectPicker";
+import { ProviderSettingsSection } from "./ProviderSettingsSection";
 import type { Repo, TrustLevel } from "../../types";
 
-type Section = "general" | "repos" | "startup" | "cuelight";
+type Section = "general" | "repos" | "startup" | "cuelight" | "providers";
 
 const MIN_SCAN_DEPTH = 0;
 const MAX_SCAN_DEPTH = 12;
@@ -267,6 +269,14 @@ export function WorkspaceSettingsPage() {
               <Clapperboard size={13} />
               CueLight
             </button>
+            <button
+              type="button"
+              className={`wsp-nav-item ${section === "providers" ? "wsp-nav-active" : ""}`}
+              onClick={() => setSection("providers")}
+            >
+              <Key size={13} />
+              {t("nav.providers", { defaultValue: "Providers" })}
+            </button>
           </div>
 
           {/* Content */}
@@ -462,6 +472,10 @@ export function WorkspaceSettingsPage() {
 
             {section === "cuelight" && workspace && (
               <CueLightProjectPicker workspaceId={workspace.id} />
+            )}
+
+            {section === "providers" && (
+              <ProviderSettingsSection />
             )}
           </div>
         </div>

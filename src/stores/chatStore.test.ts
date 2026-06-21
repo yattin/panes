@@ -68,6 +68,7 @@ describe("chatStore send", () => {
       listCodexApps: vi.fn().mockResolvedValue([]),
       listCodexSkills: vi.fn().mockResolvedValue([]),
       listCodexRemoteThreads: vi.fn().mockResolvedValue({ threads: [], nextCursor: null }),
+      listNativeSkills: vi.fn().mockResolvedValue([]),
       listOpenCodeRemoteSessions: vi.fn().mockResolvedValue({ sessions: [], nextCursor: null }),
       nowIso: () => new Date().toISOString(),
       performanceNow: () => performance.now(),
@@ -175,6 +176,61 @@ describe("chatStore send", () => {
     await expect(sendPromise).resolves.toBe(true);
   });
 
+  it("uses displayMessage for the optimistic user message while sending the agent prompt", async () => {
+    mockIpc.sendMessage.mockResolvedValueOnce("assistant-message-id");
+
+    await expect(
+      useChatStore.getState().send("hidden cuelight agent prompt", {
+        displayMessage: "完善 CueLight 视觉设计\n\n用户补充：\n明确为3d动画",
+      }),
+    ).resolves.toBe(true);
+
+    const state = useChatStore.getState();
+    expect(state.messages[0]).toMatchObject({
+      role: "user",
+      content: "完善 CueLight 视觉设计\n\n用户补充：\n明确为3d动画",
+      blocks: [
+        {
+          type: "text",
+          content: "完善 CueLight 视觉设计\n\n用户补充：\n明确为3d动画",
+        },
+      ],
+    });
+    expect(mockIpc.sendMessage).toHaveBeenCalledWith(
+      "thread-1",
+      "hidden cuelight agent prompt",
+      null,
+      null,
+      null,
+      null,
+      false,
+      expect.any(String),
+      "完善 CueLight 视觉设计\n\n用户补充：\n明确为3d动画",
+    );
+  });
+
+  it("does not send a displayMessage override for ordinary structured input items", async () => {
+    mockIpc.sendMessage.mockResolvedValueOnce("assistant-message-id");
+
+    await expect(
+      useChatStore.getState().send("use prototype", {
+        inputItems: [{ type: "skill", name: "prototype", path: "C:/skills/prototype/SKILL.md" }],
+      }),
+    ).resolves.toBe(true);
+
+    expect(mockIpc.sendMessage).toHaveBeenCalledWith(
+      "thread-1",
+      "use prototype",
+      null,
+      null,
+      null,
+      [{ type: "skill", name: "prototype", path: "C:/skills/prototype/SKILL.md" }],
+      false,
+      expect.any(String),
+      null,
+    );
+  });
+
   it("removes the optimistic turn if the turn request fails", async () => {
     mockIpc.sendMessage.mockRejectedValueOnce(new Error("send failed"));
 
@@ -256,6 +312,62 @@ describe("chatStore send", () => {
         clientTurnId: optimisticAssistant?.clientTurnId,
       }),
     );
+
+    vi.useRealTimers();
+  });
+
+  it("calculates action duration on completion when the runtime omits it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-21T00:00:00.000Z"));
+
+    let streamHandler: ((event: StreamEvent) => void) | null = null;
+    mockListenThreadEvents.mockImplementationOnce(async (_threadId, onEvent) => {
+      streamHandler = onEvent;
+      return () => {};
+    });
+
+    await useChatStore.getState().setActiveThread("thread-1");
+
+    mockIpc.sendMessage.mockResolvedValueOnce("assistant-message-id");
+    await expect(useChatStore.getState().send("hello")).resolves.toBe(true);
+
+    expect(streamHandler).not.toBeNull();
+    streamHandler!({
+      type: "ActionStarted",
+      action_id: "action-duration",
+      engine_action_id: null,
+      action_type: "other",
+      summary: "cuelight_get_visual_bible",
+      details: {},
+    });
+    await vi.advanceTimersByTimeAsync(20);
+
+    vi.setSystemTime(new Date("2026-06-21T00:00:01.250Z"));
+    streamHandler!({
+      type: "ActionCompleted",
+      action_id: "action-duration",
+      result: {
+        success: true,
+        output: "{}",
+        durationMs: 0,
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(20);
+
+    const assistant = useChatStore
+      .getState()
+      .messages.find((message) => message.role === "assistant" && message.blocks?.length);
+    expect(assistant?.blocks?.[0]).toMatchObject({
+      type: "action",
+      actionId: "action-duration",
+      status: "done",
+      result: {
+        success: true,
+        output: "{}",
+        durationMs: 1250,
+      },
+    });
 
     vi.useRealTimers();
   });
@@ -458,6 +570,7 @@ describe("chatStore send", () => {
         outputDeferred: false,
         outputDeferredLoaded: true,
         status: "running",
+        startedAt: expect.any(Number),
       },
     ]);
 
@@ -904,6 +1017,7 @@ describe("chatStore send", () => {
         outputDeferred: false,
         outputDeferredLoaded: true,
         status: "running",
+        startedAt: expect.any(Number),
       },
     ]);
 
@@ -949,6 +1063,7 @@ describe("chatStore send", () => {
       null,
       [{ type: "mention", name: "Docs", path: "app://docs" }],
       false,
+      null,
     );
     expect(useChatStore.getState().messages).toHaveLength(1);
     expect(useChatStore.getState().messages[0]).toMatchObject({

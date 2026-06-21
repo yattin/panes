@@ -143,6 +143,7 @@ pub async fn send_message(
     state: State<'_, AppState>,
     thread_id: String,
     message: String,
+    display_message: Option<String>,
     model_id: Option<String>,
     reasoning_effort: Option<String>,
     attachments: Option<Vec<ChatAttachmentPayload>>,
@@ -171,6 +172,11 @@ pub async fn send_message(
         .filter(|value| !value.is_empty());
     let attachments = normalize_attachments(attachments)?;
     let input_items = normalize_input_items(message.as_str(), input_items)?;
+    let display_message = display_message
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
     let plan_mode = plan_mode.unwrap_or(false);
     let turn_input = TurnInput {
         message: message.clone(),
@@ -467,16 +473,21 @@ pub async fn send_message(
     let assistant_message = match run_db(db.clone(), {
         let thread_id = thread.id.clone();
         let message = message.clone();
+        let persisted_message = display_message.clone().unwrap_or_else(|| message.clone());
+        let persisted_input_items = if display_message.is_some() {
+            Vec::new()
+        } else {
+            input_items.clone()
+        };
         let attachments = attachments.clone();
-        let input_items = input_items.clone();
         let plan_mode_enabled = plan_mode;
         let engine_id = thread.engine_id.clone();
         let model_id = effective_model_id.clone();
         let reasoning_effort = reasoning_effort.clone();
         move |db| {
             let user_blocks = build_user_blocks(
-                &message,
-                &input_items,
+                &persisted_message,
+                &persisted_input_items,
                 &attachments,
                 plan_mode_enabled,
                 false,
@@ -484,7 +495,7 @@ pub async fn send_message(
             db::messages::insert_user_message(
                 db,
                 &thread_id,
-                &message,
+                &persisted_message,
                 Some(serde_json::to_value(&user_blocks)?),
                 Some(engine_id.as_str()),
                 Some(model_id.as_str()),
@@ -698,6 +709,7 @@ pub async fn steer_message(
     state: State<'_, AppState>,
     thread_id: String,
     message: String,
+    display_message: Option<String>,
     attachments: Option<Vec<ChatAttachmentPayload>>,
     input_items: Option<Vec<ChatInputItemPayload>>,
     plan_mode: Option<bool>,
@@ -727,6 +739,11 @@ pub async fn steer_message(
         .ok_or_else(|| format!("thread `{thread_id}` has no active engine thread id"))?;
     let attachments = normalize_attachments(attachments)?;
     let input_items = normalize_input_items(message.as_str(), input_items)?;
+    let display_message = display_message
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
     let plan_mode = plan_mode.unwrap_or(false);
     let turn_input = TurnInput {
         message: message.clone(),
@@ -737,11 +754,23 @@ pub async fn steer_message(
     let effective_model_id = thread_last_model_id(thread.engine_metadata.as_ref())
         .unwrap_or_else(|| thread.model_id.clone());
     let reasoning_effort = thread_reasoning_effort(thread.engine_metadata.as_ref());
-    let user_blocks = build_user_blocks(&message, &input_items, &attachments, plan_mode, true);
+    let persisted_message = display_message.clone().unwrap_or_else(|| message.clone());
+    let persisted_input_items = if display_message.is_some() {
+        Vec::new()
+    } else {
+        input_items.clone()
+    };
+    let user_blocks = build_user_blocks(
+        &persisted_message,
+        &persisted_input_items,
+        &attachments,
+        plan_mode,
+        true,
+    );
 
     let user_message = run_db(db.clone(), {
         let thread_id = thread.id.clone();
-        let message = message.clone();
+        let message = persisted_message.clone();
         let user_blocks = user_blocks.clone();
         let engine_id = thread.engine_id.clone();
         let model_id = effective_model_id.clone();

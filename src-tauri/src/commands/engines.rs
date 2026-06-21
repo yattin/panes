@@ -54,6 +54,18 @@ pub async fn list_codex_skills(
 }
 
 #[tauri::command]
+pub async fn list_native_skills(
+    state: State<'_, AppState>,
+    cwd: String,
+) -> Result<Vec<CodexSkillDto>, String> {
+    state
+        .engines
+        .list_native_skills(cwd.trim())
+        .await
+        .map_err(err_to_string)
+}
+
+#[tauri::command]
 pub async fn list_codex_apps(state: State<'_, AppState>) -> Result<Vec<CodexAppDto>, String> {
     state.engines.list_codex_apps().await.map_err(err_to_string)
 }
@@ -190,4 +202,54 @@ pub async fn get_native_history_tokens(
 #[tauri::command]
 pub fn get_context_max_tokens() -> usize {
     crate::engines::EngineManager::get_context_max_tokens()
+}
+
+// ---------------------------------------------------------------------------
+// Provider configuration
+// ---------------------------------------------------------------------------
+
+use crate::provider_config::{merge_api_key, ProviderConfigEntry, ProviderSettings};
+
+/// Load all provider settings from disk.  API keys are masked before they
+/// cross the IPC boundary so secrets never reach the frontend in plaintext.
+#[tauri::command]
+pub async fn get_provider_settings() -> Result<ProviderSettings, String> {
+    Ok(ProviderSettings::load().masked())
+}
+
+/// Save configuration for a single provider.
+///
+/// `api_key` semantics:
+/// - `None` or a masked placeholder (`••••…`) → keep the stored value as-is
+/// - empty string → clear the stored key
+/// - any other value → overwrite
+///
+/// The whole read-modify-write is guarded by `provider_settings_lock` so
+/// concurrent saves cannot clobber each other.
+#[tauri::command]
+pub async fn set_provider_config(
+    state: State<'_, AppState>,
+    provider_id: String,
+    enabled: bool,
+    api_key: Option<String>,
+    api_base: Option<String>,
+    models: Option<std::collections::HashMap<String, bool>>,
+) -> Result<(), String> {
+    let _guard = state.provider_settings_lock.lock().await;
+    let mut settings = ProviderSettings::load();
+    let entry = settings.providers.entry(provider_id).or_insert_with(|| {
+        ProviderConfigEntry {
+            enabled: true,
+            api_key: None,
+            api_base: None,
+            models: std::collections::HashMap::new(),
+        }
+    });
+    entry.enabled = enabled;
+    entry.api_key = merge_api_key(entry.api_key.take(), api_key);
+    entry.api_base = api_base;
+    if let Some(m) = models {
+        entry.models = m;
+    }
+    settings.save().map_err(|e| e.to_string())
 }

@@ -14,6 +14,10 @@ pub struct AppState {
     pub db: Database,
     pub config: Arc<AppConfig>,
     pub config_write_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Serializes read-modify-write of `provider-config.json` so concurrent
+    /// `set_provider_config` calls (multi-window, rapid clicks) don't clobber
+    /// each other.
+    pub provider_settings_lock: Arc<tokio::sync::Mutex<()>>,
     pub engines: Arc<EngineManager>,
     pub git_watchers: Arc<GitWatcherManager>,
     pub terminals: Arc<TerminalManager>,

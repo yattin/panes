@@ -14,6 +14,7 @@ mod path_utils;
 #[path = "contexts/power_management/mod.rs"]
 mod power;
 mod process_utils;
+mod provider_config;
 mod runtime_env;
 mod state;
 #[path = "contexts/terminal_session/mod.rs"]
@@ -90,6 +91,7 @@ pub fn run() {
         db: db.clone(),
         config: Arc::new(app_config),
         config_write_lock: Arc::new(tokio::sync::Mutex::new(())),
+        provider_settings_lock: Arc::new(tokio::sync::Mutex::new(())),
         engines: Arc::new(EngineManager::with_db(db)),
         git_watchers: Arc::new(GitWatcherManager::default()),
         terminals: Arc::new(TerminalManager::default()),
@@ -282,12 +284,15 @@ pub fn run() {
             commands::engines::engine_health,
             commands::engines::prewarm_engine,
             commands::engines::list_codex_skills,
+            commands::engines::list_native_skills,
             commands::engines::list_codex_apps,
             commands::engines::get_opencode_runtime_catalog,
             commands::engines::run_engine_check,
             commands::engines::compact_native_thread,
             commands::engines::get_native_history_tokens,
             commands::engines::get_context_max_tokens,
+            commands::engines::get_provider_settings,
+            commands::engines::set_provider_config,
             commands::threads::list_threads,
             commands::threads::list_archived_threads,
             commands::threads::list_codex_remote_threads,
