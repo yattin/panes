@@ -1678,9 +1678,9 @@ pub fn build_cuelight_system_prompt_appendix(ctx: &CueLightThreadContext) -> Str
         .unwrap_or_default();
 
     format!(
-        r#"## CueLight 业务上下文
+        r#"## 当前绑定 CueLight 项目的业务上下文
 
-当前会话运行在 CueLight 影视制作平台中。你需要以专业 AI 影视导演/编剧助手的方式，帮助用户完成短剧/短视频制作：
+以下信息来自当前工作区绑定的 CueLight 项目，用于增强基础 agent 的影视制作能力。处理 CueLight 或影视任务时，应结合项目状态与工具结果，帮助用户完成短剧/短视频制作：
 - 剧本创作：世界观构建、角色设计、场景规划、分集剧本撰写
 - 视觉设计：角色参考图生成、场景氛围图生成、视觉风格设定
 - 分镜制作：为每集编写分镜脚本（videoPrompt）、设定镜头语言
@@ -1720,7 +1720,8 @@ pub fn build_cuelight_system_prompt_appendix(ctx: &CueLightThreadContext) -> Str
 5. 异步任务：图片/视频生成是异步的，提交后告知用户 taskId，可用 cuelight_task_status 查询进度
 6. 当需要分析剧本原文、查找剧情依据或回答外部原文内容时，先用 `cuelight_download_original_script` 下载原文，再用本地文件工具读取和检索，不要用 bible、episodes、角色、场景、道具或分镜等派生数据冒充原文
 7. 不要请求 source chunks、source analysis、分季、keyframes、video assets、composite、export videos 或编剧/source workflow 能力；当前模式只基于本地原文读写核心资产、集数剧本和分镜
-8. 使用中文与用户交流，videoPrompt 和技术参数使用英文"#,
+8. 使用“故事设计 / 视觉设计 / 剧本设计”等面向用户的中文术语
+9. 使用中文与用户交流，videoPrompt 和技术参数使用英文"#,
         ctx.project_name,
         ctx.project_id,
         project_type,
@@ -1776,10 +1777,13 @@ mod tests {
             storyboard_count: 12,
         });
 
-        assert!(appendix.contains("CueLight 业务上下文"));
+        assert!(appendix.contains("当前绑定 CueLight 项目的业务上下文"));
+        assert!(appendix.contains("增强基础 agent 的影视制作能力"));
         assert!(appendix.contains("项目名称：Demo Film"));
         assert!(appendix.contains("cuelight_project_status"));
+        assert!(appendix.contains("故事设计 / 视觉设计 / 剧本设计"));
         assert!(appendix.contains("使用中文与用户交流"));
+        assert!(!appendix.contains("圣经"));
         assert!(!appendix.contains("Claurst"));
         assert!(!appendix.contains("native agent runtime inside Panes"));
         assert!(!appendix.contains("Preserve user work"));

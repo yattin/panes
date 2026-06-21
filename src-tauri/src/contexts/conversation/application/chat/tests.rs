@@ -707,6 +707,30 @@ fn model_reroute_notice_reindexes_action_blocks() {
 }
 
 #[test]
+fn error_events_update_status_without_persisting_error_blocks() {
+    let mut blocks = Vec::new();
+    let mut action_index = HashMap::new();
+    let mut approval_index = HashMap::new();
+
+    let progress = apply_event_to_blocks(
+        &mut blocks,
+        &mut action_index,
+        &mut approval_index,
+        &EngineEvent::Error {
+            message: "upstream model returned no content".to_string(),
+            recoverable: false,
+        },
+        1000,
+    );
+
+    assert!(blocks.is_empty());
+    assert!(!progress.blocks_changed);
+    assert_eq!(progress.message_status, Some(MessageStatusDto::Error));
+    assert_eq!(progress.thread_status, Some(ThreadStatusDto::Error));
+    assert!(progress.force_persist);
+}
+
+#[test]
 fn diff_update_collapses_existing_same_scope_diff_blocks() {
     let mut blocks = vec![
         ContentBlock::Diff {

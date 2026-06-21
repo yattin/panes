@@ -412,10 +412,6 @@ pub(super) async fn run_turn(
     match engine_task.await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => {
-            blocks.push(ContentBlock::Error {
-                message: format!("Engine error: {error}"),
-            });
-            blocks_dirty = true;
             if message_status != MessageStatusDto::Error {
                 message_status = MessageStatusDto::Error;
                 message_state_dirty = true;
@@ -433,10 +429,6 @@ pub(super) async fn run_turn(
             );
         }
         Err(error) => {
-            blocks.push(ContentBlock::Error {
-                message: format!("Engine task join error: {error}"),
-            });
-            blocks_dirty = true;
             if message_status != MessageStatusDto::Error {
                 message_status = MessageStatusDto::Error;
                 message_state_dirty = true;
@@ -445,6 +437,13 @@ pub(super) async fn run_turn(
                 thread_status = ThreadStatusDto::Error;
                 thread_status_dirty = true;
             }
+            let _ = app.emit(
+                &stream_event_topic,
+                EngineEvent::Error {
+                    message: format!("Engine task join error: {error}"),
+                    recoverable: false,
+                },
+            );
         }
     }
 
@@ -963,10 +962,6 @@ pub(super) async fn run_codex_review_turn(
     match engine_task.await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => {
-            blocks.push(ContentBlock::Error {
-                message: format!("Engine error: {error}"),
-            });
-            blocks_dirty = true;
             if message_status != MessageStatusDto::Error {
                 message_status = MessageStatusDto::Error;
                 message_state_dirty = true;
@@ -984,10 +979,6 @@ pub(super) async fn run_codex_review_turn(
             );
         }
         Err(error) => {
-            blocks.push(ContentBlock::Error {
-                message: format!("Engine task join error: {error}"),
-            });
-            blocks_dirty = true;
             if message_status != MessageStatusDto::Error {
                 message_status = MessageStatusDto::Error;
                 message_state_dirty = true;
@@ -996,6 +987,13 @@ pub(super) async fn run_codex_review_turn(
                 thread_status = ThreadStatusDto::Error;
                 thread_status_dirty = true;
             }
+            let _ = app.emit(
+                &stream_event_topic,
+                EngineEvent::Error {
+                    message: format!("Engine task join error: {error}"),
+                    recoverable: false,
+                },
+            );
         }
     }
 

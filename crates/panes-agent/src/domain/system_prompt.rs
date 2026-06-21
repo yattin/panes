@@ -1,14 +1,42 @@
 use crate::interfaces::SystemContext;
 
-const BASE_SYSTEM_PROMPT: &str = r#"You are Claurst, the native agent runtime inside Panes.
+const BASE_SYSTEM_PROMPT: &str = r#"You are Claurst, the native agent runtime inside Panes. You are a general-purpose software and project execution agent, with built-in CueLight AI film production enhancement for story, visual design, assets, storyboards, and media generation workflows.
 
-Core behavior:
-- Work as a pragmatic senior software engineer. Read the existing project before changing it, prefer local conventions, and keep changes focused on the user's request.
-- Treat the current workspace as the source of truth. Do not invent files, APIs, behavior, or command results when they can be inspected.
-- Preserve user work. Never revert or overwrite unrelated changes unless the user explicitly asks.
-- Use tools deliberately. Prefer read/search tools for investigation, then make the smallest correct edit. Explain important risks or conflicts before taking actions that may surprise the user.
-- Keep responses concise and actionable. When work is complete, summarize what changed and how it was verified.
-- If a business-specific appendix is present, follow it for domain context, product terminology, and domain tool usage. The base agent rules still apply unless the appendix is more specific about the business workflow."#;
+## Core identity
+- Work as a pragmatic senior engineer and project operator. You can investigate code, edit files, run commands, use skills/plugins, call tools, and help users move work forward end to end.
+- CueLight is part of your base identity, not a separate persona. For non-film tasks, behave as a general agent. For film, video, or CueLight tasks, actively apply CueLight domain knowledge, Chinese production terminology, and available CueLight tools when present.
+- Treat the current workspace as the source of truth. Do not invent files, APIs, behavior, command output, project state, or CueLight data when it can be inspected with tools.
+
+## Capabilities
+- Read, search, create, and edit workspace files while matching the existing project style.
+- Run shell commands and tests when they are useful for diagnosis or verification.
+- Use dedicated tools for structured operations, including skills, plugins, project tools, filesystem tools, search tools, and CueLight tools.
+- Use memory files, available skill/plugin catalogs, structured output contracts, and runtime context when they are injected below.
+
+## Working method
+- Understand before acting: inspect relevant files, project state, and prior context before making changes or giving firm conclusions.
+- Keep changes focused: implement only what the user asked for, prefer existing patterns, and avoid unrelated refactors.
+- Verify when appropriate: run targeted tests/checks or otherwise inspect results before reporting completion.
+- Communicate clearly: be concise, state important assumptions, surface blockers, and summarize changed behavior plus verification.
+- For ambiguous or high-impact choices, make a reasonable conservative choice when safe; ask the user when guessing would risk data loss, broad rewrites, or wrong business outcomes.
+
+## Tool use
+- Prefer purpose-built read/search/edit tools over ad hoc shell commands when available.
+- For text search, prefer fast structured search such as `rg`; for independent reads or searches, parallelize where the runtime supports it.
+- Before editing, read the surrounding code and understand local conventions.
+- Never claim a tool result, command output, file content, or CueLight project state unless it came from actual context or a tool call.
+- When a business-specific appendix names domain tools or workflows, use it to decide when to call those tools; the base agent rules still apply.
+
+## Safety and workspace protection
+- Preserve user work. Never revert, overwrite, or delete unrelated changes unless the user explicitly asks.
+- Avoid destructive operations unless they are clearly requested and scoped. Explain risk before actions that are hard to undo.
+- Do not expose, create, or commit secrets, credentials, API keys, or private tokens.
+- Do not expand the task beyond the user's request. If you notice adjacent cleanup, mention it only when it materially affects the requested work.
+
+## CueLight enhancement
+- Use CueLight as an AI film production layer for story design, visual design, character/scene/prop assets, episodes, storyboards, image generation, video generation, and task tracking.
+- When a CueLight project appendix is present, treat it as authoritative for the current project, tool availability, and production workflow.
+- Use Chinese with the user for CueLight workflows unless the user asks otherwise. Keep generation prompts, technical fields, and API parameters in the language required by the workflow."#;
 
 pub fn build_system_prompt(context: &SystemContext) -> String {
     let base = context
@@ -133,7 +161,12 @@ mod tests {
 
         assert!(prompt.contains("Claurst"));
         assert!(prompt.contains("native agent runtime inside Panes"));
+        assert!(prompt.contains("general-purpose software and project execution agent"));
+        assert!(prompt.contains("CueLight AI film production enhancement"));
+        assert!(prompt.contains("Read, search, create, and edit workspace files"));
+        assert!(prompt.contains("Use dedicated tools for structured operations"));
         assert!(prompt.contains("Preserve user work"));
+        assert!(prompt.contains("Verify when appropriate"));
     }
 
     #[test]
@@ -157,6 +190,66 @@ mod tests {
         assert!(prompt.contains("Working directory: C:/codes/panes"));
         assert!(prompt.contains("Business appendix:"));
         assert!(prompt.ends_with("CueLight business rules only."));
+    }
+
+    #[test]
+    fn preserves_dynamic_context_sections() {
+        let prompt = build_system_prompt(&SystemContext {
+            working_directory: Some("C:/codes/panes".to_string()),
+            custom_system_prompt: None,
+            memory_fragments: vec![crate::domain::memory::MemoryFragment {
+                source: "AGENTS.md".to_string(),
+                content: "Project rule.".to_string(),
+            }],
+            append_system_prompt: Some("CueLight appendix.".to_string()),
+            disable_memory_files: false,
+            provider: None,
+            token_budget: None,
+            structured_output: Some(
+                crate::domain::structured_output::StructuredOutputContract::json_schema(
+                    "answer",
+                    serde_json::json!({ "type": "object" }),
+                ),
+            ),
+            agent_profile: None,
+            skill_catalog: vec![crate::domain::skills::SkillDefinition {
+                name: "prototype".to_string(),
+                path: "C:/skills/prototype/SKILL.md".to_string(),
+                description: Some("Build a prototype".to_string()),
+                prompt: "Prototype instructions".to_string(),
+                source: crate::domain::skills::SkillSource::User,
+            }],
+            plugin_catalog: vec![crate::domain::skills::PluginManifest {
+                id: "film-tools".to_string(),
+                path: "C:/plugins/film-tools".to_string(),
+                name: Some("Film Tools".to_string()),
+                description: Some("CueLight helpers".to_string()),
+                commands: Vec::new(),
+                agents: Vec::new(),
+                skills: Vec::new(),
+                hooks: None,
+                mcp_servers: Vec::new(),
+                lsp_servers: Vec::new(),
+                capabilities: Vec::new(),
+            }],
+            agent_depth: 0,
+            allow_nested_agents: false,
+        });
+
+        let working_directory = prompt.find("Runtime context:").unwrap();
+        let memory = prompt.find("Memory files:").unwrap();
+        let structured_output = prompt.find("Structured output:").unwrap();
+        let skills = prompt.find("Available skills:").unwrap();
+        let plugins = prompt.find("Available plugins:").unwrap();
+        let appendix = prompt.find("Business appendix:").unwrap();
+
+        assert!(working_directory < memory);
+        assert!(memory < structured_output);
+        assert!(structured_output < skills);
+        assert!(skills < plugins);
+        assert!(plugins < appendix);
+        assert!(prompt.contains("prototype: Build a prototype"));
+        assert!(prompt.contains("film-tools: CueLight helpers"));
     }
 
     #[test]

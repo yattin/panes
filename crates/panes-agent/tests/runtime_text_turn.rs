@@ -102,6 +102,49 @@ async fn runtime_rejects_invalid_structured_output_json() {
         .contains("structured output `answer` was not valid JSON"));
 }
 
+#[tokio::test]
+async fn runtime_retries_model_stream_errors_before_output() {
+    let events = RecordingEventSink::default();
+    let model = ScriptedModelClient::new(vec![
+        vec![ModelStreamEvent::Error(
+            "upstream model returned no content".to_string(),
+        )],
+        vec![
+            ModelStreamEvent::TextDelta("retry succeeded".to_string()),
+            ModelStreamEvent::Done,
+        ],
+    ]);
+    let runtime = AgentRuntime::new(ToolLoopPorts {
+        model: model.clone(),
+        events: events.clone(),
+        tools: StaticToolExecutor::text("unused"),
+    });
+
+    let outcome = runtime
+        .run_turn(RunTurnCommand {
+            conversation_id: "thread-retry".to_string(),
+            messages: vec![AgentMessage::user("try again")],
+            system_context: SystemContext::new(Some("C:/codes/panes".to_string())),
+            cancellation: CancellationToken::new(),
+        })
+        .await
+        .expect("runtime should retry transient model stream errors");
+
+    assert_eq!(outcome.assistant_text, "retry succeeded");
+    assert_eq!(model.requests().len(), 2);
+    let event_log = events.events();
+    assert!(event_log.iter().any(|event| matches!(
+        event,
+        AgentEvent::TranscriptEntry { entry_type, data }
+            if entry_type == "model_turn_retry"
+                && data.get("retry").and_then(serde_json::Value::as_u64) == Some(1)
+    )));
+    assert!(event_log.iter().any(|event| matches!(
+        event,
+        AgentEvent::TurnCompleted { metrics, .. } if metrics.model_turn_count == 2
+    )));
+}
+
 impl AgentRuntimePorts for TestPorts {
     type Model = StaticModelClient;
     type Events = RecordingEventSink;

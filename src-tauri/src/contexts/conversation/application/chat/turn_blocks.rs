@@ -243,14 +243,7 @@ pub(super) fn apply_event_to_blocks(
             progress.thread_status = Some(ThreadStatusDto::AwaitingApproval);
             progress.force_persist = true;
         }
-        EngineEvent::Error {
-            message,
-            recoverable,
-        } => {
-            blocks.push(ContentBlock::Error {
-                message: message.to_string(),
-            });
-            progress.blocks_changed = true;
+        EngineEvent::Error { recoverable, .. } => {
             if !recoverable {
                 progress.message_status = Some(MessageStatusDto::Error);
                 progress.thread_status = Some(ThreadStatusDto::Error);
