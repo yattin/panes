@@ -17,9 +17,12 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "audit:claurst-clean-room": "node scripts/audit-claurst-clean-room.mjs",
     "check:codex-schema": "node scripts/check-codex-app-server-parity.mjs",
     "tauri:dev": "tauri dev",
+    "tauri:dev:cuelight": "tauri dev --config src-tauri/tauri.cuelight.conf.json",
     "tauri:build": "tauri build",
+    "tauri:build:cuelight": "tauri build --config src-tauri/tauri.cuelight.conf.json",
     "tauri:build:unsigned": "tauri build --config src-tauri/tauri.unsigned.conf.json",
     "release:check": "node scripts/should-release.mjs",
     "release": "release-it"

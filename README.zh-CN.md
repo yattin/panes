@@ -109,6 +109,12 @@ open /Applications/Panes.app
 
 维护者可在 [docs/homebrew-distribution.md](./docs/homebrew-distribution.md) 查看 tap 与发布自动化配置。
 
+### CueLight 发行版
+
+CueLight 当前作为独立 Tauri flavor 发布，主 Panes 发行版保持不变。本地开发使用 `pnpm tauri:dev:cuelight`，发行构建使用 `pnpm tauri:build:cuelight`。该 flavor 会把应用名设为 CueLight，使用 `com.panes.cuelight` bundle identifier，并为 CueLight 独立 updater feed 产出更新文件。
+
+发行文案、updater 细节和最终图标清单见 [docs/cuelight-distribution.md](./docs/cuelight-distribution.md)。
+
 ### 在 Windows 上安装
 
 从 [GitHub Releases](https://github.com/wygoralves/panes/releases/latest) 下载最新的 `*-setup.exe` 安装包并运行。后续更新通过 Tauri 更新器在应用内交付。
@@ -208,8 +214,8 @@ cargo clippy --manifest-path src-tauri/Cargo.toml
 
 Rust workspace 位于仓库根目录（`Cargo.toml`），包含：
 
+- `crates/panes-agent/` — CueLight/claurst-native 干净重构 agent runtime
 - `src-tauri/` — Tauri 后端
-- `vendor/claude-code-rust/` — 内置的 Claude Code 引擎（`claude-code-native`）
 
 在 Tauri/Rust 开发过程中，构建产物会迅速膨胀。`pnpm prune:artifacts` 会移除所有仓库本地的已生成输出，而 `pnpm prune:artifacts:stale` 仅清理超过 7 天的 Rust/Tauri 产物。两者在下一次构建时都能安全重新生成，陈旧模式还支持 `--older-than-days=<n>` 以自定义时间窗口。
 

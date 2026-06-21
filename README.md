@@ -109,6 +109,12 @@ open /Applications/Panes.app
 
 Maintainers can find the tap/release automation setup in [docs/homebrew-distribution.md](./docs/homebrew-distribution.md).
 
+### CueLight Distribution
+
+CueLight is available as a dedicated Tauri flavor while the main Panes distribution remains unchanged. Use `pnpm tauri:dev:cuelight` for local development and `pnpm tauri:build:cuelight` for release builds. The flavor sets the app name to CueLight, uses the `com.panes.cuelight` bundle identifier, and publishes updater artifacts for the CueLight updater feed.
+
+See [docs/cuelight-distribution.md](./docs/cuelight-distribution.md) for release copy, updater details, and the remaining final icon checklist.
+
 ### Install on Windows
 
 Download the latest `*-setup.exe` installer from [GitHub Releases](https://github.com/wygoralves/panes/releases/latest) and run it. Later updates are delivered in-app through the Tauri updater.
@@ -208,8 +214,8 @@ cargo clippy --manifest-path src-tauri/Cargo.toml
 
 The Rust workspace lives at the repository root (`Cargo.toml`) and includes:
 
+- `crates/panes-agent/` — CueLight/claurst-native clean-room agent runtime
 - `src-tauri/` — Tauri backend
-- `vendor/claude-code-rust/` — vendored built-in Claude Code engine (`claude-code-native`)
 
 Generated build artifacts can grow quickly during Tauri/Rust development. `pnpm prune:artifacts` removes all repo-local generated output, while `pnpm prune:artifacts:stale` trims only Rust/Tauri artifacts older than 7 days. Both are safe to regenerate on the next build, and the stale mode also accepts `--older-than-days=<n>` if you want a different window.
 

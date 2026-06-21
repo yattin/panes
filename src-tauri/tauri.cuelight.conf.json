@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CueLight",
+  "identifier": "com.panes.cuelight",
+  "app": {
+    "windows": [
+      {
+        "create": false,
+        "title": "CueLight",
+        "width": 1460,
+        "height": 920,
+        "minWidth": 1080,
+        "minHeight": 680,
+        "resizable": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  },
+  "bundle": {
+    "icon": [
+      "icons-cuelight/32x32.png",
+      "icons-cuelight/64x64.png",
+      "icons-cuelight/128x128.png",
+      "icons-cuelight/128x128@2x.png",
+      "icons-cuelight/icon.png",
+      "icons-cuelight/icon.icns",
+      "icons-cuelight/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://wygoralves.github.io/panes/cuelight/latest.json"]
+    }
+  }
+}
