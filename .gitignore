@@ -34,6 +34,7 @@ agents_docs/
 
 # OpenSpec local workspace artifacts
 openspec/
+temp-dir/
 
 # GitHub prompt/skill artifacts for local agent workflows
 .github/prompts/

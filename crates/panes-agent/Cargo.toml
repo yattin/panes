@@ -1,0 +1,24 @@
+[package]
+name = "panes-agent"
+version = "0.1.0"
+edition = "2021"
+authors = ["Panes contributors"]
+license = "MIT"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+globset = "0.4"
+ignore = "0.4"
+regex = "1"
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
