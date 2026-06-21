@@ -10,6 +10,7 @@ pub(super) async fn run_turn(
     turn_input: TurnInput,
     client_turn_id: Option<String>,
     cancellation: CancellationToken,
+    initial_events: Vec<EngineEvent>,
 ) {
     let max_output_chars = state.config.debug.max_action_output_chars;
     let (event_tx, mut event_rx) = mpsc::channel::<EngineEvent>(ENGINE_EVENT_QUEUE_CAPACITY);
@@ -94,6 +95,54 @@ pub(super) async fn run_turn(
         initial_force_persist,
     )
     .await;
+
+    for initial_event in initial_events {
+        let progress = process_stream_event(
+            &app,
+            &state,
+            &thread,
+            &assistant_message_id,
+            &stream_event_topic,
+            &approval_event_topic,
+            &initial_event,
+            &mut blocks,
+            &mut action_index,
+            &mut approval_index,
+            max_output_chars,
+        )
+        .await;
+        let force_persist = apply_stream_progress(
+            progress,
+            &mut message_status,
+            &mut thread_status,
+            &mut turn_model_id,
+            &mut token_usage,
+            &mut blocks_dirty,
+            &mut message_state_dirty,
+            &mut thread_status_dirty,
+            &mut turn_model_dirty,
+        );
+        if force_persist {
+            flush_stream_state(
+                &state,
+                &thread,
+                &assistant_message_id,
+                &blocks,
+                &message_status,
+                &thread_status,
+                &turn_model_id,
+                &mut blocks_dirty,
+                &mut message_state_dirty,
+                &mut thread_status_dirty,
+                &mut turn_model_dirty,
+                &mut last_persisted_thread_status,
+                &mut last_persist_at,
+                &mut last_blocks_persist_at,
+                force_persist,
+            )
+            .await;
+        }
+    }
 
     loop {
         let incoming_event = if pending_event.is_some() {

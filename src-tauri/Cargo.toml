@@ -13,8 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Claude Code Rust integration
-claude_code_rs = { path = "../vendor/claude-code-rust", default-features = false, features = ["i18n"] }
+panes-agent = { path = "../crates/panes-agent" }
 
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
@@ -25,7 +24,7 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 
 tokio = { workspace = true }
-tokio-util = "0.7"
+tokio-util = { workspace = true }
 tokio-stream = "0.1"
 futures = { workspace = true }
 async-trait = { workspace = true }

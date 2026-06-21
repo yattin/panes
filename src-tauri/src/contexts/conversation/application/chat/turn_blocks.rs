@@ -257,7 +257,7 @@ pub(super) fn apply_event_to_blocks(
                 progress.force_persist = true;
             }
         }
-        EngineEvent::UsageLimitsUpdated { .. } => {}
+        EngineEvent::UsageLimitsUpdated { .. } | EngineEvent::TranscriptEntry { .. } => {}
     }
 
     progress

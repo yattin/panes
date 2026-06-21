@@ -172,6 +172,10 @@ pub enum EngineEvent {
         title: String,
         message: String,
     },
+    TranscriptEntry {
+        entry_type: String,
+        data: serde_json::Value,
+    },
     Error {
         message: String,
         recoverable: bool,

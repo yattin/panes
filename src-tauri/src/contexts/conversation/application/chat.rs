@@ -58,6 +58,8 @@ mod approvals;
 mod attachments;
 #[path = "chat/input.rs"]
 mod input;
+#[path = "chat/legacy_native.rs"]
+mod legacy_native;
 #[path = "chat/message_query.rs"]
 mod message_query;
 #[path = "chat/policy.rs"]
@@ -83,6 +85,7 @@ use approvals::{
 #[cfg(test)]
 use attachments::pasted_image_extension;
 use input::*;
+use legacy_native::*;
 use policy::*;
 use review::*;
 use turn_blocks::*;
@@ -200,6 +203,23 @@ pub async fn send_message(
         &effective_model_id,
         attachment_catalog.as_deref(),
     )?;
+
+    let legacy_native_migration = migrate_legacy_native_thread_metadata(&mut thread);
+    if legacy_native_migration
+        .as_ref()
+        .map(|migration| migration.metadata_changed)
+        .unwrap_or(false)
+    {
+        let metadata = thread
+            .engine_metadata
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}));
+        run_db(db.clone(), {
+            let thread_id = thread.id.clone();
+            move |db| db::threads::update_engine_metadata(db, &thread_id, &metadata)
+        })
+        .await?;
+    }
 
     let (workspace, repos, selected_repo) = run_db(db.clone(), {
         let workspace_id = thread.workspace_id.clone();
@@ -496,6 +516,11 @@ pub async fn send_message(
     let turn_input_for_task = turn_input.clone();
     let thread_for_task = thread.clone();
     let initial_turn_model_id = effective_model_id.clone();
+    let initial_events = legacy_native_migration
+        .into_iter()
+        .filter_map(|migration| migration.notice)
+        .map(LegacyNativeMigrationNotice::into_engine_event)
+        .collect::<Vec<_>>();
 
     tokio::spawn(async move {
         run_turn(
@@ -508,6 +533,7 @@ pub async fn send_message(
             turn_input_for_task,
             client_turn_id,
             cancellation,
+            initial_events,
         )
         .await;
     });

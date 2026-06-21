@@ -10,8 +10,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     engines::{
-        claude_code_native::ClaudeCodeNativeEngine,
         claude_sidecar::ClaudeSidecarEngine,
+        claurst_native::ClaurstNativeEngine,
         codex::{CodexEngine, CodexForkedThread, CodexReviewStarted},
         opencode::OpenCodeEngine,
     },
@@ -23,9 +23,8 @@ use crate::{
 };
 
 pub mod api_direct;
-#[path = "../contexts/agent_runtime/claude_code_native/mod.rs"]
-pub mod claude_code_native;
 pub mod claude_sidecar;
+pub mod claurst_native;
 #[path = "../contexts/agent_runtime/codex/mod.rs"]
 pub mod codex;
 #[path = "../contexts/agent_runtime/codex_event_mapper/mod.rs"]
@@ -136,7 +135,7 @@ const CLAUDE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
     approval_decisions: &["accept", "decline", "accept_for_session"],
 };
 
-const CLAUDE_CODE_NATIVE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
+const CLAURST_NATIVE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
     permission_modes: &["restricted", "standard", "trusted"],
     sandbox_modes: &["read-only", "workspace-write"],
     approval_decisions: &["accept", "decline", "accept_for_session"],
@@ -151,7 +150,7 @@ const OPENCODE_CAPABILITIES: EngineCapabilities = EngineCapabilities {
 pub fn capabilities_for_engine(engine_id: &str) -> EngineCapabilities {
     match engine_id {
         "claude" => CLAUDE_CAPABILITIES,
-        "claude-code-native" => CLAUDE_CODE_NATIVE_CAPABILITIES,
+        "claude-code-native" | "claurst-native" => CLAURST_NATIVE_CAPABILITIES,
         "codex" => CODEX_CAPABILITIES,
         "opencode" => OPENCODE_CAPABILITIES,
         _ => EngineCapabilities {
@@ -160,6 +159,10 @@ pub fn capabilities_for_engine(engine_id: &str) -> EngineCapabilities {
             approval_decisions: &[],
         },
     }
+}
+
+fn is_claurst_native_alias(engine_id: &str) -> bool {
+    matches!(engine_id, "claurst-native" | "claude-code-native")
 }
 
 pub fn engine_supports_sandbox_mode(engine_id: &str, sandbox_mode: &str) -> bool {
@@ -469,28 +472,29 @@ pub trait Engine: Send + Sync {
 pub struct EngineManager {
     codex: Arc<CodexEngine>,
     claude: Arc<ClaudeSidecarEngine>,
-    claude_code_native: Arc<ClaudeCodeNativeEngine>,
+    claurst_native: Arc<ClaurstNativeEngine>,
     opencode: Arc<OpenCodeEngine>,
 }
 
 impl EngineManager {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             codex: Arc::new(CodexEngine::default()),
             claude: Arc::new(ClaudeSidecarEngine::default()),
-            claude_code_native: Arc::new(ClaudeCodeNativeEngine::new()),
+            claurst_native: Arc::new(ClaurstNativeEngine::new()),
             opencode: Arc::new(OpenCodeEngine::default()),
         }
     }
 
     /// 创建引擎管理器并传入数据库引用（用于 CueLight 绑定加载）
     pub fn with_db(db: crate::db::Database) -> Self {
-        let mut native_engine = ClaudeCodeNativeEngine::new();
-        native_engine.set_db(db);
+        let mut claurst_native = ClaurstNativeEngine::new();
+        claurst_native.set_db(db);
         Self {
             codex: Arc::new(CodexEngine::default()),
             claude: Arc::new(ClaudeSidecarEngine::default()),
-            claude_code_native: Arc::new(native_engine),
+            claurst_native: Arc::new(claurst_native),
             opencode: Arc::new(OpenCodeEngine::default()),
         }
     }
@@ -537,16 +541,16 @@ impl EngineManager {
                 capabilities: map_engine_capabilities(capabilities_for_engine(self.codex.id())),
             },
             EngineInfoDto {
-                id: self.claude_code_native.id().to_string(),
-                name: self.claude_code_native.name().to_string(),
+                id: self.claurst_native.id().to_string(),
+                name: self.claurst_native.name().to_string(),
                 models: self
-                    .claude_code_native
+                    .claurst_native
                     .models()
                     .into_iter()
                     .map(map_model_info)
                     .collect(),
                 capabilities: map_engine_capabilities(capabilities_for_engine(
-                    self.claude_code_native.id(),
+                    self.claurst_native.id(),
                 )),
             },
         ];
@@ -612,22 +616,41 @@ impl EngineManager {
                 })
             }
             "claude-code-native" => {
-                let available = self.claude_code_native.is_available().await;
+                let available = self.claurst_native.is_available().await;
                 Ok(EngineHealthDto {
                     id: "claude-code-native".to_string(),
                     available,
                     version: Some(env!("CARGO_PKG_VERSION").to_string()),
                     details: Some(if available {
-                        "Claude Code Native engine is ready".to_string()
+                        "claude-code-native is deprecated and routed to CueLight Agent".to_string()
                     } else {
-                        "Configure API credentials for Claude Code Native".to_string()
+                        "ANTHROPIC_API_KEY is required for CueLight Agent".to_string()
                     }),
-                    warnings: vec![],
+                    warnings: vec![
+                        "claude-code-native is a legacy alias; use claurst-native for new threads"
+                            .to_string(),
+                    ],
                     checks: vec![],
                     fixes: vec![],
                     protocol_diagnostics: None,
                 })
             }
+            "claurst-native" => Ok(EngineHealthDto {
+                id: "claurst-native".to_string(),
+                available: self.claurst_native.is_available().await,
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                details: Some(
+                    "claurst-native Anthropic Messages adapter is registered".to_string(),
+                ),
+                warnings: if self.claurst_native.is_available().await {
+                    vec![]
+                } else {
+                    vec!["ANTHROPIC_API_KEY is not set".to_string()]
+                },
+                checks: vec![],
+                fixes: vec![],
+                protocol_diagnostics: None,
+            }),
             _ => anyhow::bail!("unknown engine: {engine_id}"),
         }
     }
@@ -636,7 +659,7 @@ impl EngineManager {
         match engine_id {
             "codex" => self.codex.prewarm().await,
             "claude" => self.claude.prewarm().await,
-            "claude-code-native" => Ok(()),
+            "claude-code-native" | "claurst-native" => Ok(()),
             "opencode" => self.opencode.prewarm().await,
             _ => anyhow::bail!("unknown engine: {engine_id}"),
         }
@@ -799,11 +822,11 @@ impl EngineManager {
                 .start_thread(scope, resume_id, effective_model_id, sandbox)
                 .await
                 .context("failed to start opencode thread")?,
-            "claude-code-native" => self
-                .claude_code_native
+            engine_id if is_claurst_native_alias(engine_id) => self
+                .claurst_native
                 .start_thread(scope, resume_id, effective_model_id, sandbox)
                 .await
-                .context("failed to start claude-code-native thread")?,
+                .context("failed to start claurst-native thread")?,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         };
 
@@ -834,11 +857,11 @@ impl EngineManager {
                 .send_message(engine_thread_id, input, event_tx, cancellation)
                 .await
                 .context("opencode send_message failed"),
-            "claude-code-native" => self
-                .claude_code_native
+            engine_id if is_claurst_native_alias(engine_id) => self
+                .claurst_native
                 .send_message(engine_thread_id, input, event_tx, cancellation)
                 .await
-                .context("claude-code-native send_message failed"),
+                .context("claurst-native send_message failed"),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -865,11 +888,11 @@ impl EngineManager {
                 .steer_message(engine_thread_id, input)
                 .await
                 .context("opencode steer_message failed"),
-            "claude-code-native" => self
-                .claude_code_native
+            engine_id if is_claurst_native_alias(engine_id) => self
+                .claurst_native
                 .steer_message(engine_thread_id, input)
                 .await
-                .context("claude-code-native steer_message failed"),
+                .context("claurst-native steer_message failed"),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -897,8 +920,8 @@ impl EngineManager {
                     .respond_to_approval(approval_id, response, route)
                     .await
             }
-            "claude-code-native" => {
-                self.claude_code_native
+            engine_id if is_claurst_native_alias(engine_id) => {
+                self.claurst_native
                     .respond_to_approval(approval_id, response, route)
                     .await
             }
@@ -911,7 +934,9 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.interrupt(engine_thread_id).await,
             "claude" => self.claude.interrupt(engine_thread_id).await,
-            "claude-code-native" => self.claude_code_native.interrupt(engine_thread_id).await,
+            engine_id if is_claurst_native_alias(engine_id) => {
+                self.claurst_native.interrupt(engine_thread_id).await
+            }
             "opencode" => self.opencode.interrupt(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
@@ -925,38 +950,32 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.archive_thread(engine_thread_id).await,
             "claude" => self.claude.archive_thread(engine_thread_id).await,
-            "claude-code-native" => {
-                self.claude_code_native
-                    .archive_thread(engine_thread_id)
-                    .await
+            engine_id if is_claurst_native_alias(engine_id) => {
+                self.claurst_native.archive_thread(engine_thread_id).await
             }
             "opencode" => self.opencode.archive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
 
-    /// 手动压缩 claude-code-native 线程的历史记录
-    /// 返回压缩前后的 token 数
+    /// Deprecated compatibility endpoint for the removed claude-code-native runtime.
     pub async fn compact_native_thread(
         &self,
-        engine_thread_id: &str,
+        _engine_thread_id: &str,
     ) -> anyhow::Result<(usize, usize)> {
-        self.claude_code_native
-            .compact_thread(engine_thread_id)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to compact thread: {}", e))
+        anyhow::bail!(
+            "claude-code-native manual compaction is deprecated; claurst-native manages context internally"
+        )
     }
 
-    /// 获取 claude-code-native 线程的当前历史 token 数
-    pub async fn get_native_history_tokens(&self, engine_thread_id: &str) -> usize {
-        self.claude_code_native
-            .get_history_tokens(engine_thread_id)
-            .await
+    /// Deprecated compatibility endpoint for the removed claude-code-native runtime.
+    pub async fn get_native_history_tokens(&self, _engine_thread_id: &str) -> usize {
+        0
     }
 
     /// 获取上下文最大限制（token 数）
     pub fn get_context_max_tokens() -> usize {
-        claude_code_native::ClaudeCodeNativeEngine::get_context_max_tokens()
+        1_000_000
     }
 
     pub async fn unarchive_thread(&self, thread: &ThreadDto) -> anyhow::Result<()> {
@@ -967,10 +986,8 @@ impl EngineManager {
         match thread.engine_id.as_str() {
             "codex" => self.codex.unarchive_thread(engine_thread_id).await,
             "claude" => self.claude.unarchive_thread(engine_thread_id).await,
-            "claude-code-native" => {
-                self.claude_code_native
-                    .unarchive_thread(engine_thread_id)
-                    .await
+            engine_id if is_claurst_native_alias(engine_id) => {
+                self.claurst_native.unarchive_thread(engine_thread_id).await
             }
             "opencode" => self.opencode.unarchive_thread(engine_thread_id).await,
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
@@ -1000,7 +1017,7 @@ impl EngineManager {
     ) -> anyhow::Result<()> {
         match thread.engine_id.as_str() {
             "codex" => self.codex.set_thread_name(engine_thread_id, name).await,
-            "claude" | "claude-code-native" | "opencode" => Ok(()),
+            "claude" | "claude-code-native" | "claurst-native" | "opencode" => Ok(()),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }
@@ -1023,7 +1040,7 @@ impl EngineManager {
                 .read_thread_sync_snapshot(engine_thread_id)
                 .await
                 .map(Some),
-            "claude" | "claude-code-native" | "opencode" => Ok(None),
+            "claude" | "claude-code-native" | "claurst-native" | "opencode" => Ok(None),
             _ => anyhow::bail!("unsupported engine_id {}", thread.engine_id),
         }
     }

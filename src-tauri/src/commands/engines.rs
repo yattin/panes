@@ -160,8 +160,8 @@ fn err_to_string(error: impl std::fmt::Display) -> String {
     format!("{error:#}")
 }
 
-/// 手动压缩 claude-code-native 线程的历史记录
-/// 返回 (压缩前 token 数, 压缩后 token 数)
+/// Deprecated: claude-code-native manual compaction was removed with the
+/// claude_code_rs runtime. The command is kept for old frontend compatibility.
 #[tauri::command]
 pub async fn compact_native_thread(
     state: State<'_, AppState>,
@@ -174,7 +174,7 @@ pub async fn compact_native_thread(
         .map_err(err_to_string)
 }
 
-/// 获取 claude-code-native 线程的当前历史 token 数
+/// Deprecated: old claude-code-native in-memory history no longer exists.
 #[tauri::command]
 pub async fn get_native_history_tokens(
     state: State<'_, AppState>,

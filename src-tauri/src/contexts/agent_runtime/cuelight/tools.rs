@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use panes_agent::ToolSpec;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -91,7 +92,23 @@ impl CueLightThreadContext {
 }
 
 /// 构建 CueLight 影视工具定义列表
+#[allow(dead_code)]
 pub fn build_cuelight_tool_definitions() -> Vec<Value> {
+    build_cuelight_tool_specs()
+        .into_iter()
+        .map(tool_spec_to_openai_function)
+        .collect()
+}
+
+/// 构建 provider-neutral CueLight 工具规格。
+pub fn build_cuelight_tool_specs() -> Vec<ToolSpec> {
+    build_cuelight_openai_tool_definitions()
+        .into_iter()
+        .filter_map(openai_function_to_tool_spec)
+        .collect()
+}
+
+fn build_cuelight_openai_tool_definitions() -> Vec<Value> {
     vec![
         json!({
             "type": "function",
@@ -590,6 +607,34 @@ pub fn build_cuelight_tool_definitions() -> Vec<Value> {
             }
         }),
     ]
+}
+
+fn openai_function_to_tool_spec(tool: Value) -> Option<ToolSpec> {
+    let function = tool.get("function")?;
+    Some(ToolSpec {
+        name: function.get("name")?.as_str()?.to_string(),
+        description: function
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        input_schema: function
+            .get("parameters")
+            .cloned()
+            .unwrap_or_else(|| json!({ "type": "object", "properties": {} })),
+    })
+}
+
+#[allow(dead_code)]
+fn tool_spec_to_openai_function(spec: ToolSpec) -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": spec.name,
+            "description": spec.description,
+            "parameters": spec.input_schema,
+        }
+    })
 }
 
 fn entity_tool_definition(
@@ -1612,8 +1657,8 @@ fn parse_json_or_raw(text: &str) -> Value {
     serde_json::from_str(text).unwrap_or_else(|_| json!({ "raw": text }))
 }
 
-/// 构建 CueLight 影视模式的 system prompt
-pub fn build_cuelight_system_prompt(ctx: &CueLightThreadContext) -> String {
+/// 构建 CueLight 影视模式的业务 system prompt 附录。
+pub fn build_cuelight_system_prompt_appendix(ctx: &CueLightThreadContext) -> String {
     let style_prompt = ctx
         .style_prompt_summary
         .as_ref()
@@ -1633,16 +1678,15 @@ pub fn build_cuelight_system_prompt(ctx: &CueLightThreadContext) -> String {
         .unwrap_or_default();
 
     format!(
-        r#"你是一个 AI 影视创作助手，运行在 CueLight 影视制作平台上。
+        r#"## CueLight 业务上下文
 
-## 身份与职责
-你是专业的 AI 影视导演/编剧助手，帮助用户完成短剧/短视频的全流程制作：
+当前会话运行在 CueLight 影视制作平台中。你需要以专业 AI 影视导演/编剧助手的方式，帮助用户完成短剧/短视频制作：
 - 剧本创作：世界观构建、角色设计、场景规划、分集剧本撰写
 - 视觉设计：角色参考图生成、场景氛围图生成、视觉风格设定
 - 分镜制作：为每集编写分镜脚本（videoPrompt）、设定镜头语言
 - 视频生成：提交图片/视频生成任务、管理生成进度
 
-## 当前项目
+## CueLight 当前项目
 - 项目名称：{}
 - 项目 ID：{}
 {}
@@ -1651,7 +1695,7 @@ pub fn build_cuelight_system_prompt(ctx: &CueLightThreadContext) -> String {
 - 集数：{} 集
 - 分镜数：{} 个
 
-## 可用工具
+## CueLight 可用工具
 你拥有以下 CueLight 影视制作工具：
 - `cuelight_project_status`：查看项目完整状态和进度
 - `cuelight_get_story_bible` / `cuelight_update_story_bible`：读取或更新剧本圣经
@@ -1668,7 +1712,7 @@ pub fn build_cuelight_system_prompt(ctx: &CueLightThreadContext) -> String {
 - `cuelight_list_models`：查看可用的图片/视频生成模型
 - `cuelight_download_original_script`：下载项目剧本原文到本地 `.cuelight/original-script/original-script.txt`，之后可用 `file_read` / `search` / `list_files` 分析原文
 
-## 工作规范
+## CueLight 工作规范
 1. 操作前先查询：修改或创建前，先用查询工具了解当前项目状态
 2. 分镜 Prompt 规范：videoPrompt 应包含画面描述、镜头运动、光影氛围，使用英文撰写
 3. 角色一致性：分镜中涉及的角色必须通过 referenceCharacterIds 关联
@@ -1700,6 +1744,45 @@ mod tests {
             .collect();
 
         assert!(names.contains(&"cuelight_download_original_script".to_string()));
+    }
+
+    #[test]
+    fn cuelight_tool_specs_expose_provider_neutral_registry() {
+        let specs = build_cuelight_tool_specs();
+        let original_script = specs
+            .iter()
+            .find(|spec| spec.name == "cuelight_download_original_script")
+            .expect("original script tool spec");
+
+        assert!(original_script
+            .description
+            .contains("下载当前 CueLight 项目的剧本原文"));
+        assert_eq!(original_script.input_schema["type"], "object");
+        assert!(original_script.input_schema["properties"]
+            .get("source_document_id")
+            .is_some());
+    }
+
+    #[test]
+    fn cuelight_system_prompt_appendix_is_business_scoped() {
+        let appendix = build_cuelight_system_prompt_appendix(&CueLightThreadContext {
+            project_id: "project-1".to_string(),
+            project_name: "Demo Film".to_string(),
+            project_type: Some("short-drama".to_string()),
+            video_aspect_ratio: Some("9:16".to_string()),
+            style_prompt_summary: Some("moody noir".to_string()),
+            episode_count: 3,
+            character_count: 2,
+            storyboard_count: 12,
+        });
+
+        assert!(appendix.contains("CueLight 业务上下文"));
+        assert!(appendix.contains("项目名称：Demo Film"));
+        assert!(appendix.contains("cuelight_project_status"));
+        assert!(appendix.contains("使用中文与用户交流"));
+        assert!(!appendix.contains("Claurst"));
+        assert!(!appendix.contains("native agent runtime inside Panes"));
+        assert!(!appendix.contains("Preserve user work"));
     }
 
     #[test]

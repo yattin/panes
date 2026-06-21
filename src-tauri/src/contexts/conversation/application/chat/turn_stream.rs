@@ -137,7 +137,9 @@ pub(super) async fn process_stream_event(
         let _ = app.emit(approval_event_topic, &normalized_event);
     }
 
-    if state.config.debug.persist_engine_event_logs {
+    if state.config.debug.persist_engine_event_logs
+        || matches!(&normalized_event, EngineEvent::TranscriptEntry { .. })
+    {
         let log_event = engine_event_for_debug_log(&normalized_event);
         if let Ok(value) = serde_json::to_value(&log_event) {
             if let Err(error) = run_db(state.db.clone(), {
