@@ -27,6 +27,14 @@ describe("resolveEngineCapabilities", () => {
     });
   });
 
+  it("falls back to CueLight Agent native defaults when capabilities are unavailable", () => {
+    expect(resolveEngineCapabilities("claurst-native", null)).toEqual({
+      permissionModes: ["restricted", "standard", "trusted"],
+      sandboxModes: ["read-only", "workspace-write"],
+      approvalDecisions: ["accept", "decline", "accept_for_session"],
+    });
+  });
+
   it("falls back to OpenCode defaults when capabilities are unavailable", () => {
     expect(resolveEngineCapabilities("opencode", null)).toEqual({
       permissionModes: ["ask", "allow", "deny"],

@@ -10,6 +10,7 @@ export const CHAT_ENGINE_INSTALL_HARNESS_IDS: Readonly<Record<OnboardingChatEngi
   codex: "codex",
   claude: "claude-code",
   "claude-code-native": "claude-code-native",
+  "claurst-native": "claurst-native",
   opencode: "opencode",
 };
 
@@ -171,8 +172,8 @@ export function isChatEngineReady(
     );
   }
 
-  if (engineId === "claude-code-native") {
-    return engineHealth["claude-code-native"]?.available ?? true;
+  if (engineId === "claude-code-native" || engineId === "claurst-native") {
+    return engineHealth[engineId]?.available ?? true;
   }
 
   return engineHealth[engineId]?.available ?? false;

@@ -1,20 +1,20 @@
 {
   "greeting": {
-    "title": "Bem-vindo ao Panes",
-    "subtitle": "Seu cockpit local para programação assistida por IA.",
+    "title": "Bem-vindo ao CueLight",
+    "subtitle": "Seu workspace local de IA para produção audiovisual e narrativa.",
     "cta": "Começar"
   },
   "workflow": {
     "title": "Qual é sua forma preferida de trabalhar?",
-    "subtitle": "Escolha o fluxo que o Panes deve otimizar primeiro. Você pode reabrir o onboarding depois e mudar isso.",
+    "subtitle": "Escolha o fluxo que o CueLight deve otimizar primeiro. Você pode reabrir o onboarding depois e mudar isso.",
     "options": {
       "cli": {
         "title": "CLI Agents",
         "description": "Veja quais CLIs de agent o Panes já suporta, instale as que fizerem sentido e depois escolha o workspace onde quer começar."
       },
       "chat": {
-        "title": "Chat com Codex / Claude / OpenCode",
-        "description": "Escolha Codex, Claude, OpenCode ou qualquer combinação. O Panes verifica o que está pronto, ajuda a instalar o que faltar e depois leva você para um workspace."
+        "title": "Chat com CueLight Agent",
+        "description": "Use o CueLight Agent por padrão ou escolha Codex, Claude, OpenCode ou qualquer combinação para fluxos avançados. O CueLight verifica a prontidão e depois leva você para um workspace."
       }
     }
   },
@@ -26,8 +26,8 @@
   },
   "chatEngines": {
     "title": "Escolha seus harnesses de chat",
-    "subtitle": "Selecione quais harnesses você quer deixar prontos dentro do chat do Panes.",
-    "helper": "Você pode selecionar Native, Codex, Claude, OpenCode ou qualquer combinação. O próximo passo verifica cada runtime selecionado antes de continuar.",
+    "subtitle": "Selecione quais harnesses você quer deixar prontos dentro do chat do CueLight.",
+    "helper": "CueLight Agent é o engine Native padrão. Você também pode selecionar Codex, Claude, OpenCode ou qualquer combinação. O próximo passo verifica cada runtime selecionado antes de continuar.",
     "options": {
       "codex": {
         "description": "Chat via Codex App Server. Pode instalar Node.js e Codex CLI se estiverem ausentes."
@@ -35,8 +35,8 @@
       "claude": {
         "description": "Chat via Claude Agent SDK. Não exige instalar a Claude CLI separadamente."
       },
-      "claudeCodeNative": {
-        "description": "Chat integrado via claude-code-rust. Roda dentro do Panes sem um processo CLI separado."
+      "cuelightAgent": {
+        "description": "Native Agent integrado com a marca CueLight. Roda dentro do app para projetos audiovisuais e workspaces locais."
       },
       "opencode": {
         "description": "Chat via servidor headless do OpenCode. Exige a CLI opencode no PATH."

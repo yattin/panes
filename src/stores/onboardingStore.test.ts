@@ -128,14 +128,14 @@ describe("onboardingStore", () => {
     storage.setItem(ONBOARDING_WORKFLOW_KEY, "chat");
     storage.setItem(
       ONBOARDING_CHAT_ENGINES_KEY,
-      JSON.stringify(["opencode", "claude", "invalid", "codex", "claude"]),
+      JSON.stringify(["opencode", "claude", "invalid", "claurst-native", "codex", "claude"]),
     );
 
     expect(readStoredOnboardingState()).toEqual({
       completed: false,
       legacyCompleted: false,
       preferredWorkflow: "chat",
-      selectedChatEngines: ["codex", "claude", "opencode"],
+      selectedChatEngines: ["claurst-native", "codex", "claude", "opencode"],
     });
   });
 
@@ -143,11 +143,11 @@ describe("onboardingStore", () => {
     useOnboardingStore.getState().setPreferredWorkflow("chat");
     useOnboardingStore
       .getState()
-      .setSelectedChatEngines(["opencode", "claude", "codex", "claude"]);
+      .setSelectedChatEngines(["opencode", "claude", "claurst-native", "codex", "claude"]);
 
     expect(storage.getItem(ONBOARDING_WORKFLOW_KEY)).toBe("chat");
     expect(storage.getItem(ONBOARDING_CHAT_ENGINES_KEY)).toBe(
-      JSON.stringify(["codex", "claude", "opencode"]),
+      JSON.stringify(["claurst-native", "codex", "claude", "opencode"]),
     );
   });
 
@@ -158,7 +158,7 @@ describe("onboardingStore", () => {
       completed: false,
       legacyCompleted: true,
       preferredWorkflow: null,
-      selectedChatEngines: ["claude-code-native"],
+      selectedChatEngines: ["claurst-native"],
     });
   });
 

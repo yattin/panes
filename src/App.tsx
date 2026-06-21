@@ -150,6 +150,8 @@ function resolveAgentDisplayName(engineId: ChatEngineId): string {
   switch (engineId) {
     case "claude":
       return "Claude";
+    case "claurst-native":
+      return "CueLight Agent";
     case "claude-code-native":
       return "Native";
     case "opencode":

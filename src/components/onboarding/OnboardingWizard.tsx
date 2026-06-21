@@ -73,8 +73,8 @@ const CHAT_ENGINE_OPTIONS: Array<{
   descriptionKey: string;
 }> = [
   {
-    id: "claude-code-native",
-    descriptionKey: "chatEngines.options.claudeCodeNative.description",
+    id: "claurst-native",
+    descriptionKey: "chatEngines.options.cuelightAgent.description",
   },
   { id: "codex", descriptionKey: "chatEngines.options.codex.description" },
   ...(__NON_NATIVE_HARNESSES__ ? [
@@ -89,6 +89,8 @@ function chatEngineLabel(engineId: OnboardingChatEngineId): string {
       return "Codex";
     case "claude":
       return "Claude";
+    case "claurst-native":
+      return "CueLight Agent";
     case "claude-code-native":
       return "Native";
     case "opencode":

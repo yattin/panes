@@ -12,7 +12,7 @@ const CLAUDE_CAPABILITIES: EngineCapabilities = {
   approvalDecisions: ["accept", "decline", "accept_for_session"],
 };
 
-const CLAUDE_CODE_NATIVE_CAPABILITIES: EngineCapabilities = {
+const NATIVE_CAPABILITIES: EngineCapabilities = {
   permissionModes: ["restricted", "standard", "trusted"],
   sandboxModes: ["read-only", "workspace-write"],
   approvalDecisions: ["accept", "decline", "accept_for_session"],
@@ -37,7 +37,8 @@ function fallbackEngineCapabilities(engineId?: string | null): EngineCapabilitie
     case "claude":
       return CLAUDE_CAPABILITIES;
     case "claude-code-native":
-      return CLAUDE_CODE_NATIVE_CAPABILITIES;
+    case "claurst-native":
+      return NATIVE_CAPABILITIES;
     case "opencode":
       return OPENCODE_CAPABILITIES;
     default:

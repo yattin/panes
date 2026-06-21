@@ -4,13 +4,14 @@ import type {
 } from "../../../types";
 
 export const CHAT_ENGINE_ORDER: OnboardingChatEngineId[] = [
+  "claurst-native",
   "claude-code-native",
   "codex",
   "claude",
   "opencode",
 ];
 
-export const DEFAULT_CHAT_ENGINES: OnboardingChatEngineId[] = ["claude-code-native"];
+export const DEFAULT_CHAT_ENGINES: OnboardingChatEngineId[] = ["claurst-native"];
 
 export function normalizeOnboardingWorkflow(
   value: string | null,
@@ -28,6 +29,7 @@ export function normalizeOnboardingChatEngines(
       value === "codex" ||
       value === "claude" ||
       value === "claude-code-native" ||
+      value === "claurst-native" ||
       value === "opencode"
     ) {
       selected.add(value);

@@ -1,20 +1,20 @@
 {
   "greeting": {
-    "title": "欢迎使用 Panes",
-    "subtitle": "您的本地 AI 辅助编程控制台。",
+    "title": "欢迎使用 CueLight",
+    "subtitle": "面向影视创作工作流的本地 AI 工作台。",
     "cta": "开始使用"
   },
   "workflow": {
     "title": "您更喜欢如何工作？",
-    "subtitle": "选择 Panes 应首先优化的工作流程。您可以稍后重新打开引导并切换。",
+    "subtitle": "选择 CueLight 应首先优化的工作流程。您可以稍后重新打开引导并切换。",
     "options": {
       "cli": {
         "title": "CLI 代理",
         "description": "浏览 Panes 已支持的代理 CLI，安装您想要的，然后选择要开始的工作区。"
       },
       "chat": {
-        "title": "与 Codex / Claude / OpenCode 聊天",
-        "description": "选择 Codex、Claude、OpenCode 或任意组合。Panes 将验证准备情况，帮助安装缺失的内容，然后将您发送到工作区。"
+        "title": "与 CueLight Agent 聊天",
+        "description": "默认使用 CueLight Agent，也可以选择 Codex、Claude、OpenCode 等高级引擎。CueLight 将验证准备情况，然后将您发送到工作区。"
       }
     }
   },
@@ -26,8 +26,8 @@
   },
   "chatEngines": {
     "title": "选择您的聊天工具",
-    "subtitle": "选择您想在 Panes 聊天中准备好的工具。",
-    "helper": "您可以选择 Native、Codex、Claude、OpenCode 或任意组合。下一步将在继续之前检查每个选定的运行时。",
+    "subtitle": "选择您想在 CueLight 聊天中准备好的工具。",
+    "helper": "CueLight Agent 是默认 Native 引擎。您也可以选择 Codex、Claude、OpenCode 或任意组合。下一步将在继续之前检查每个选定的运行时。",
     "options": {
       "codex": {
         "description": "由 Codex App Server 提供支持的聊天。如果缺少 Node.js 和 Codex CLI，可能会安装它们。"
@@ -35,8 +35,8 @@
       "claude": {
         "description": "由 Claude Agent SDK 提供支持的聊天。不需要单独安装 Claude CLI。"
       },
-      "claudeCodeNative": {
-        "description": "由 claude-code-rust 提供支持的内置聊天。在 Panes 内运行，无需单独的 CLI 进程。"
+      "cuelightAgent": {
+        "description": "CueLight 品牌化的内置 Native Agent。在应用内运行，面向影视项目与本地工作区。"
       },
       "opencode": {
         "description": "由 OpenCode 无头服务器提供支持的聊天。需要 PATH 中有 opencode CLI。"

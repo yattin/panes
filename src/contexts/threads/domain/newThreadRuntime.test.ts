@@ -7,6 +7,29 @@ import type { EngineInfo, Thread } from "../../../types";
 
 const engines: EngineInfo[] = [
   {
+    id: "claurst-native",
+    name: "CueLight Agent",
+    models: [
+      {
+        id: "claude-sonnet-4-6",
+        displayName: "Claude Sonnet 4.6",
+        description: "CueLight Agent",
+        hidden: false,
+        isDefault: true,
+        inputModalities: ["text"],
+        attachmentModalities: ["text"],
+        supportsPersonality: false,
+        defaultReasoningEffort: "medium",
+        supportedReasoningEfforts: [],
+      },
+    ],
+    capabilities: {
+      permissionModes: [],
+      sandboxModes: [],
+      approvalDecisions: [],
+    },
+  },
+  {
     id: "codex",
     name: "Codex",
     models: [
@@ -170,7 +193,7 @@ describe("resolveNewThreadRuntime", () => {
     });
   });
 
-  it("falls back to codex gpt-5.4 high when no other preference exists", () => {
+  it("falls back to CueLight Agent when no other preference exists", () => {
     expect(
       resolveNewThreadRuntime({
         engines,

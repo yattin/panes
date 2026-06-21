@@ -49,8 +49,15 @@ describe("onboarding helpers", () => {
 
   it("normalizes selected chat engines in stable product order", () => {
     expect(
-      normalizeOnboardingChatEngines(["opencode", "invalid", "claude", "codex", "claude"]),
-    ).toEqual(["codex", "claude", "opencode"]);
+      normalizeOnboardingChatEngines([
+        "opencode",
+        "invalid",
+        "claurst-native",
+        "claude",
+        "codex",
+        "claude",
+      ]),
+    ).toEqual(["claurst-native", "codex", "claude", "opencode"]);
   });
 
   it("prefers the single onboarding-selected chat engine and its default model", () => {
@@ -159,6 +166,20 @@ describe("onboarding helpers", () => {
           id: "claude",
           available: true,
           warnings: ["ANTHROPIC_API_KEY is not set"],
+          checks: [],
+          fixes: [],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("lets CueLight Agent readiness depend on engine health without requiring a CLI", () => {
+    expect(
+      isChatWorkflowReady(["claurst-native"], readyDependencies, {
+        "claurst-native": {
+          id: "claurst-native",
+          available: true,
+          warnings: [],
           checks: [],
           fixes: [],
         },

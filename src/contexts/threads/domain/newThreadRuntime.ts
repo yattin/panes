@@ -13,9 +13,9 @@ export interface NewThreadRuntimeSelection {
 export type ComposerRuntimeSnapshot = NewThreadRuntimeSelection;
 
 export const NEW_THREAD_FALLBACK_RUNTIME: NewThreadRuntimeSelection = {
-  engineId: "codex",
-  modelId: "gpt-5.4",
-  reasoningEffort: "high",
+  engineId: "claurst-native",
+  modelId: "claude-sonnet-4-6",
+  reasoningEffort: null,
   serviceTier: null,
 };
 
