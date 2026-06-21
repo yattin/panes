@@ -12,6 +12,11 @@ src-tauri/helper/build/
 __pycache__/
 *.pyc
 
+# Local environment files. Keep .env.example tracked.
+.env
+.env.*
+!.env.example
+
 # Claude Code
 .claude/
 .codex/
