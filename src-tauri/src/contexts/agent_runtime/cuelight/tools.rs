@@ -1786,6 +1786,7 @@ mod tests {
         assert!(!appendix.contains("圣经"));
         assert!(!appendix.contains("Claurst"));
         assert!(!appendix.contains("native agent runtime inside Panes"));
+        assert!(!appendix.contains("通用软件/项目执行 agent"));
         assert!(!appendix.contains("Preserve user work"));
     }
 

@@ -771,7 +771,8 @@ mod tests {
         let system = body["system"]
             .as_str()
             .expect("request body should include string system prompt");
-        assert!(system.contains("native agent runtime inside Panes"));
+        assert!(system.contains("运行在 Panes 内的 native agent"));
+        assert!(system.contains("通用软件/项目执行 agent"));
         assert!(system.contains("Working directory: C:/codes/panes"));
         assert!(system.contains("Business appendix:"));
         assert!(system.contains("CueLight business appendix."));
