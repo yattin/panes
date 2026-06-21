@@ -1,16 +1,14 @@
-# Vendored dependencies
+# Vendor Directory
 
-Third-party Rust crates vendored into the Panes repository for single-repo maintenance.
+This directory is reserved for third-party reference trees and vendored assets
+that are not part of the main `panes-agent` native runtime.
 
-## claude-code-rust
+`vendor/claude-code-rust/` has been removed. `claude-code-native` is now a
+legacy engine id alias routed to `claurst-native`; the active native runtime is
+implemented in `crates/panes-agent`.
 
-Embedded as the built-in `claude-code-native` chat engine (`claude_code_rs`).
-
-- Upstream: https://github.com/lorryjovens-hub/claude-code-rust
-- Local changes: workspace integration, `blocking` reqwest feature for REPL paths
-
-When syncing upstream, replace `vendor/claude-code-rust/` and re-run:
-
-```bash
-cargo check --manifest-path src-tauri/Cargo.toml
-```
+`vendor/claurst/`, when present as a local checkout or submodule, is a GPL-3.0
+third-party behavior reference only. It is not a Panes product component, is not
+compiled by the workspace, and is explicitly not compiled or linked into Panes
+binaries. Release source and binary packages may exclude it or must keep this
+third-party status clear.
