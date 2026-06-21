@@ -5,5 +5,4 @@ scope:
     - scripts/
 source_files: []
 depends_on: []
-related_to:
-    - path: backend
+related_to: []

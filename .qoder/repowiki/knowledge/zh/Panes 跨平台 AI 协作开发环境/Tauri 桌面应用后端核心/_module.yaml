@@ -5,6 +5,4 @@ scope:
     - src-tauri/
 source_files: []
 depends_on: []
-related_to:
-    - path: frontend
-    - path: scripts
+related_to: []

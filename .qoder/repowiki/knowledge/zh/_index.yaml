@@ -2,14 +2,20 @@
 schema_version: 1
 locale: zh-CN
 branch: master
-exported_at: "2026-06-20T15:06:35Z"
+nodes_managed: true
+exported_at: "2026-06-21T10:33:20Z"
 modules:
     "":
         dir_name: Panes 跨平台 AI 协作开发环境
         title: Panes 跨平台 AI 协作开发环境
         scope: []
         source_files: []
-        children: []
+        children:
+            - backend
+            - docs
+            - frontend
+            - landing_page
+            - scripts
         depends_on: []
         related_to: []
     backend:
@@ -21,9 +27,7 @@ modules:
         children:
             - backend/platform_utilities
         depends_on: []
-        related_to:
-            - path: frontend
-            - path: scripts
+        related_to: []
     backend/platform_utilities:
         dir_name: 平台底层工具与运行时适配
         title: 平台底层工具与运行时适配
@@ -60,9 +64,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: backend
-            - path: landing_page
+        related_to: []
     landing_page:
         dir_name: Panes 产品落地页与多语言展示
         title: Panes 产品落地页与多语言展示
@@ -71,8 +73,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: frontend
+        related_to: []
     scripts:
         dir_name: 构建与发布自动化脚本
         title: 构建与发布自动化脚本
@@ -81,5 +82,4 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: backend
+        related_to: []

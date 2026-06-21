@@ -5,5 +5,4 @@ scope:
     - landing-page/
 source_files: []
 depends_on: []
-related_to:
-    - path: frontend
+related_to: []
