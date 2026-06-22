@@ -21,6 +21,8 @@ import {
   PillBottle,
   BellRing,
   Globe,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useChatStore } from "../../stores/chatStore";
 import { useThreadStore } from "../../stores/threadStore";
@@ -108,6 +110,8 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
   const setActiveView = useUiStore((state) => state.setActiveView);
   const openWorkspaceSettings = useUiStore((state) => state.openWorkspaceSettings);
   const openCommandPalette = useUiStore((state) => state.openCommandPalette);
+  const activeTheme = useUiStore((state) => state.theme);
+  const setTheme = useUiStore((state) => state.setTheme);
   const bindChatThread = useChatStore((s) => s.setActiveThread);
   const updateStatus = useUpdateStore((s) => s.status);
   const updateSnoozed = useUpdateStore((s) => s.snoozed);
@@ -154,6 +158,16 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const previousSyncedActiveWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
   const activeLocale = normalizeAppLocale(i18n.language);
+
+  const onThemeSelect = useCallback(
+    async (theme: "dark" | "light") => {
+      const result = await setTheme(theme);
+      if (!result) {
+        toast.error(t("app:sidebar.themeFailed"));
+      }
+    },
+    [setTheme, t],
+  );
 
   const closeSettingsMenu = useCallback(() => setSettingsMenuOpen(false), []);
 
@@ -458,7 +472,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
       </div>
 
       {/* ── Scrollable content ── */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", paddingBottom: 4, borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 4 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", paddingBottom: 4, borderTop: "1px solid var(--border)", marginTop: 4 }}>
         <div className="sb-section-label">
           <span>{t("app:sidebar.workspaces")}</span>
           <button
@@ -637,7 +651,7 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
         )}
 
         {/* Archived section */}
-        <div style={{ marginTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 4 }}>
+        <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 4 }}>
           <button
             type="button"
             className="sb-archived-toggle"
@@ -873,6 +887,57 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
             </div>
             <div className="git-action-menu-item" style={{ justifyContent: "space-between", cursor: "default" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {activeTheme === "light" ? (
+                  <Sun size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+                ) : (
+                  <Moon size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+                )}
+                {t("app:sidebar.theme")}
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  padding: 2,
+                  gap: 2,
+                }}
+              >
+                {(["light", "dark"] as const).map((theme) => {
+                  const selected = activeTheme === theme;
+                  const Icon = theme === "light" ? Sun : Moon;
+                  return (
+                    <button
+                      key={theme}
+                      type="button"
+                      onClick={() => { void onThemeSelect(theme); }}
+                      aria-label={t(`app:sidebar.theme${theme === "light" ? "Light" : "Dark"}`)}
+                      title={t(`app:sidebar.theme${theme === "light" ? "Light" : "Dark"}`)}
+                      style={{
+                        width: 26,
+                        height: 22,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 4,
+                        border: "none",
+                        cursor: "pointer",
+                        background: selected ? "var(--accent)" : "transparent",
+                        color: selected ? "#fff" : "var(--text-3)",
+                        boxShadow: "none",
+                        transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
+                      }}
+                    >
+                      <Icon size={12} />
+                    </button>
+                  );
+                })}
+              </span>
+            </div>
+            <div className="git-action-menu-item" style={{ justifyContent: "space-between", cursor: "default" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Globe size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
                 {t("common:language.label")}
               </span>
@@ -880,7 +945,8 @@ function SidebarContent({ onPin }: { onPin?: () => void }) {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--bg-2)",
+                  border: "1px solid var(--border)",
                   borderRadius: 6,
                   padding: 2,
                   gap: 2,

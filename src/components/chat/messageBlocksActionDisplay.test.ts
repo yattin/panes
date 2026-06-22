@@ -5,7 +5,7 @@ describe("getActionBlockDisplayText", () => {
   it("uses CueLight display label and subtitle when present", () => {
     expect(
       getActionBlockDisplayText({
-        summary: "cuelight_create_character",
+        summary: "save_drama_character",
         displayLabel: " 创建角色 ",
         displaySubtitle: " 田雨 ",
       }),
@@ -15,10 +15,10 @@ describe("getActionBlockDisplayText", () => {
     });
   });
 
-  it("maps older CueLight action blocks to Chinese labels", () => {
+  it("maps CueLight action blocks to Chinese labels", () => {
     expect(
       getActionBlockDisplayText({
-        summary: "cuelight_get_visual_bible",
+        summary: "query_visual_bible",
       }),
     ).toEqual({
       label: "读取视觉设计",
@@ -27,7 +27,7 @@ describe("getActionBlockDisplayText", () => {
 
     expect(
       getActionBlockDisplayText({
-        summary: "cuelight_update_visual_bible",
+        summary: "update_visual_bible",
       }),
     ).toEqual({
       label: "更新视觉设计",

@@ -337,7 +337,7 @@ describe("chatStore send", () => {
       action_id: "action-duration",
       engine_action_id: null,
       action_type: "other",
-      summary: "cuelight_get_visual_bible",
+      summary: "query_visual_bible",
       details: {},
     });
     await vi.advanceTimersByTimeAsync(20);

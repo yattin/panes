@@ -22,6 +22,7 @@ import { sql } from "@codemirror/lang-sql";
 import { yaml } from "@codemirror/lang-yaml";
 import { tags } from "@lezer/highlight";
 import type { EditorRevealRequest } from "../../types";
+import { useUiStore } from "../../stores/uiStore";
 
 interface Props {
   tabId: string;
@@ -36,140 +37,142 @@ interface Props {
 
 const EMPTY_EXTENSIONS: Extension[] = [];
 
-const darkVoidTheme = EditorView.theme(
-  {
-    "&": {
-      backgroundColor: "var(--bg-1)",
-      color: "var(--text-1)",
-      height: "100%",
+function createPanesEditorTheme(dark: boolean): Extension {
+  return EditorView.theme(
+    {
+      "&": {
+        backgroundColor: "var(--bg-1)",
+        color: "var(--text-1)",
+        height: "100%",
+      },
+      ".cm-scroller": {
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: "13px",
+        lineHeight: "1.6",
+      },
+      ".cm-gutters": {
+        backgroundColor: "var(--bg-2)",
+        color: "var(--text-3)",
+        border: "none",
+        borderRight: "1px solid var(--border)",
+      },
+      ".cm-cursor, .cm-dropCursor": {
+        borderLeftColor: "var(--accent)",
+        borderLeftWidth: "2px",
+      },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
+        backgroundColor: "rgba(255, 107, 107, 0.12) !important",
+      },
+      ".cm-activeLineGutter": {
+        backgroundColor: "var(--surface-hover)",
+      },
+      ".cm-activeLine": {
+        backgroundColor: "var(--surface-subtle)",
+      },
+      ".cm-foldGutter span": {
+        color: "var(--text-3)",
+        fontSize: "11px",
+      },
+      ".cm-matchingBracket": {
+        backgroundColor: "rgba(255, 107, 107, 0.18)",
+        outline: "none",
+      },
+      ".cm-searchMatch": {
+        backgroundColor: "rgba(251, 191, 36, 0.2)",
+      },
+      ".cm-searchMatch.cm-searchMatch-selected": {
+        backgroundColor: "rgba(251, 191, 36, 0.35)",
+      },
+      ".cm-panels": {
+        background: "var(--bg-2)",
+        borderTop: "1px solid var(--border)",
+      },
+      ".cm-search": {
+        padding: "6px 10px",
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "6px",
+        alignItems: "center",
+        background: "var(--bg-2)",
+        fontSize: "12px",
+        fontFamily: '"Sora", system-ui, sans-serif',
+      },
+      ".cm-search label": {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+        color: "var(--text-2)",
+        fontSize: "11px",
+        cursor: "pointer",
+        userSelect: "none",
+      },
+      ".cm-search input[type=checkbox]": {
+        accentColor: "var(--accent)",
+        cursor: "pointer",
+      },
+      ".cm-textfield": {
+        padding: "4px 8px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--border)",
+        background: "var(--bg-3)",
+        color: "var(--text-1)",
+        fontSize: "12px",
+        fontFamily: '"JetBrains Mono", monospace',
+        minWidth: "140px",
+        outline: "none",
+        transition: "border-color 120ms ease",
+      },
+      ".cm-textfield:focus": {
+        borderColor: "var(--accent)",
+      },
+      ".cm-textfield::placeholder": {
+        color: "var(--text-3)",
+      },
+      ".cm-button": {
+        padding: "4px 10px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--border-active)",
+        background: "var(--bg-3)",
+        color: "var(--text-2)",
+        fontSize: "11px",
+        cursor: "pointer",
+        transition: "all 120ms ease",
+        fontFamily: '"Sora", system-ui, sans-serif',
+      },
+      ".cm-button:hover": {
+        background: "var(--bg-4)",
+        color: "var(--text-1)",
+        borderColor: "var(--border-active)",
+      },
+      ".cm-button:active": {
+        background: "var(--bg-5)",
+      },
+      ".cm-panel-close": {
+        padding: "2px 6px",
+        borderRadius: "var(--radius-sm)",
+        border: "none",
+        background: "transparent",
+        color: "var(--text-3)",
+        fontSize: "14px",
+        cursor: "pointer",
+        lineHeight: "1",
+        marginLeft: "auto",
+        transition: "color 120ms ease, background 120ms ease",
+      },
+      ".cm-panel-close:hover": {
+        background: "var(--surface-hover)",
+        color: "var(--text-1)",
+      },
+      "&.cm-focused": {
+        outline: "none",
+      },
+      ".cm-line": {
+        padding: "0 8px",
+      },
     },
-    ".cm-scroller": {
-      fontFamily: '"JetBrains Mono", monospace',
-      fontSize: "13px",
-      lineHeight: "1.6",
-    },
-    ".cm-gutters": {
-      backgroundColor: "var(--bg-2)",
-      color: "var(--text-3)",
-      border: "none",
-      borderRight: "1px solid var(--border)",
-    },
-    ".cm-cursor, .cm-dropCursor": {
-      borderLeftColor: "var(--accent)",
-      borderLeftWidth: "2px",
-    },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
-      backgroundColor: "rgba(255, 107, 107, 0.12) !important",
-    },
-    ".cm-activeLineGutter": {
-      backgroundColor: "rgba(255, 255, 255, 0.04)",
-    },
-    ".cm-activeLine": {
-      backgroundColor: "rgba(255, 255, 255, 0.02)",
-    },
-    ".cm-foldGutter span": {
-      color: "var(--text-3)",
-      fontSize: "11px",
-    },
-    ".cm-matchingBracket": {
-      backgroundColor: "rgba(255, 107, 107, 0.18)",
-      outline: "none",
-    },
-    ".cm-searchMatch": {
-      backgroundColor: "rgba(251, 191, 36, 0.2)",
-    },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "rgba(251, 191, 36, 0.35)",
-    },
-    ".cm-panels": {
-      background: "var(--bg-2)",
-      borderTop: "1px solid var(--border)",
-    },
-    ".cm-search": {
-      padding: "6px 10px",
-      display: "flex",
-      flexWrap: "wrap",
-      gap: "6px",
-      alignItems: "center",
-      background: "var(--bg-2)",
-      fontSize: "12px",
-      fontFamily: '"Sora", system-ui, sans-serif',
-    },
-    ".cm-search label": {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "4px",
-      color: "var(--text-2)",
-      fontSize: "11px",
-      cursor: "pointer",
-      userSelect: "none",
-    },
-    ".cm-search input[type=checkbox]": {
-      accentColor: "var(--accent)",
-      cursor: "pointer",
-    },
-    ".cm-textfield": {
-      padding: "4px 8px",
-      borderRadius: "var(--radius-sm)",
-      border: "1px solid var(--border)",
-      background: "var(--bg-3)",
-      color: "var(--text-1)",
-      fontSize: "12px",
-      fontFamily: '"JetBrains Mono", monospace',
-      minWidth: "140px",
-      outline: "none",
-      transition: "border-color 120ms ease",
-    },
-    ".cm-textfield:focus": {
-      borderColor: "var(--accent)",
-    },
-    ".cm-textfield::placeholder": {
-      color: "var(--text-3)",
-    },
-    ".cm-button": {
-      padding: "4px 10px",
-      borderRadius: "var(--radius-sm)",
-      border: "1px solid var(--border-active)",
-      background: "var(--bg-3)",
-      color: "var(--text-2)",
-      fontSize: "11px",
-      cursor: "pointer",
-      transition: "all 120ms ease",
-      fontFamily: '"Sora", system-ui, sans-serif',
-    },
-    ".cm-button:hover": {
-      background: "var(--bg-4)",
-      color: "var(--text-1)",
-      borderColor: "var(--border-active)",
-    },
-    ".cm-button:active": {
-      background: "var(--bg-5)",
-    },
-    ".cm-panel-close": {
-      padding: "2px 6px",
-      borderRadius: "var(--radius-sm)",
-      border: "none",
-      background: "transparent",
-      color: "var(--text-3)",
-      fontSize: "14px",
-      cursor: "pointer",
-      lineHeight: "1",
-      marginLeft: "auto",
-      transition: "color 120ms ease, background 120ms ease",
-    },
-    ".cm-panel-close:hover": {
-      background: "rgba(255, 255, 255, 0.06)",
-      color: "var(--text-1)",
-    },
-    "&.cm-focused": {
-      outline: "none",
-    },
-    ".cm-line": {
-      padding: "0 8px",
-    },
-  },
-  { dark: true },
-);
+    { dark },
+  );
+}
 
 const darkVoidHighlight = HighlightStyle.define([
   { tag: tags.keyword, color: "#c792ea" },
@@ -247,6 +250,7 @@ interface CachedEditor {
   onChangeRef: { current: (content: string) => void };
   extraExtensionsCompartment: Compartment;
   readOnlyCompartment: Compartment;
+  themeCompartment: Compartment;
   lastAccess: number;
   docBytes: number;
 }
@@ -327,6 +331,7 @@ export function CodeMirrorEditor({
   onRevealHandled,
 }: Props) {
   const extensions = rawExtensions ?? EMPTY_EXTENSIONS;
+  const theme = useUiStore((state) => state.theme);
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -360,6 +365,7 @@ export function CodeMirrorEditor({
     const externalRef = isExternalUpdate;
     const extraExtensionsCompartment = new Compartment();
     const readOnlyCompartment = new Compartment();
+    const themeCompartment = new Compartment();
 
     const editorExtensions: Extension[] = [
       lineNumbers(),
@@ -373,7 +379,7 @@ export function CodeMirrorEditor({
       indentOnInput(),
       bracketMatching(),
       highlightActiveLine(),
-      darkVoidTheme,
+      themeCompartment.of(createPanesEditorTheme(theme === "dark")),
       syntaxHighlighting(darkVoidHighlight),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       search(),
@@ -424,6 +430,7 @@ export function CodeMirrorEditor({
       onChangeRef: changeRef,
       extraExtensionsCompartment,
       readOnlyCompartment,
+      themeCompartment,
       lastAccess: Date.now(),
       docBytes: estimateDocumentBytes(content),
     });
@@ -469,6 +476,14 @@ export function CodeMirrorEditor({
       ),
     });
   }, [tabId, readOnly]);
+
+  useEffect(() => {
+    const cached = editorCache.get(tabId);
+    if (!cached) return;
+    cached.view.dispatch({
+      effects: cached.themeCompartment.reconfigure(createPanesEditorTheme(theme === "dark")),
+    });
+  }, [tabId, theme]);
 
   useEffect(() => {
     if (!pendingReveal) {

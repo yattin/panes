@@ -237,14 +237,15 @@ pub async fn set_provider_config(
 ) -> Result<(), String> {
     let _guard = state.provider_settings_lock.lock().await;
     let mut settings = ProviderSettings::load();
-    let entry = settings.providers.entry(provider_id).or_insert_with(|| {
-        ProviderConfigEntry {
+    let entry = settings
+        .providers
+        .entry(provider_id)
+        .or_insert_with(|| ProviderConfigEntry {
             enabled: true,
             api_key: None,
             api_base: None,
             models: std::collections::HashMap::new(),
-        }
-    });
+        });
     entry.enabled = enabled;
     entry.api_key = merge_api_key(entry.api_key.take(), api_key);
     entry.api_base = api_base;

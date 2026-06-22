@@ -1,4 +1,5 @@
 import type { AppLocale } from "../domain/appLocale";
+import type { AppTheme } from "../domain/appTheme";
 
 export interface FileDialogFilter {
   name: string;
@@ -40,6 +41,7 @@ export interface ShellUiGateway {
   destroyNativeWindow(): Promise<void>;
   getAppVersion(): Promise<string>;
   getPersistedAppLocale(): Promise<AppLocale | null>;
+  getPersistedAppTheme(): Promise<AppTheme>;
   hideNativeWindow(): Promise<void>;
   isNativeWindowFullscreen(): Promise<boolean>;
   isTauriRuntime(): boolean;
@@ -51,6 +53,7 @@ export interface ShellUiGateway {
   openExternalUrl(url: string): Promise<void>;
   readExplorerOpenPreference(): boolean | null;
   readGitPanelPinnedPreference(): boolean | null;
+  readCachedAppTheme(): AppTheme | null;
   readSidebarPinnedPreference(): boolean | null;
   saveTextFile(options: {
     title?: string;
@@ -70,11 +73,13 @@ export interface ShellUiGateway {
   }): Promise<{ path: string; text: string } | null>;
   setNativeWindowFullscreen(fullscreen: boolean): Promise<void>;
   setPersistedAppLocale(locale: AppLocale): Promise<AppLocale>;
+  setPersistedAppTheme(theme: AppTheme): Promise<AppTheme>;
   startNativeWindowDrag(): Promise<void>;
   startNativeWindowResizeDrag(direction: WindowResizeDirection): Promise<void>;
   toggleNativeWindowMaximize(): Promise<void>;
   writeExplorerOpenPreference(open: boolean): void;
   writeGitPanelPinnedPreference(pinned: boolean): void;
+  writeCachedAppTheme(theme: AppTheme): void;
   writeSidebarPinnedPreference(pinned: boolean): void;
 }
 

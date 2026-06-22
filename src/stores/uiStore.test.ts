@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_PALETTE_DEFAULT_LAUNCH } from "../contexts/shell-ui/domain/commandPalette";
+import type { AppTheme } from "../contexts/shell-ui/domain/appTheme";
 
 type UiStoreModule = typeof import("./uiStore");
 type ShellUiGatewayModule = typeof import("../contexts/shell-ui/application/shellUiGateway");
@@ -14,6 +15,7 @@ describe("uiStore focus mode", () => {
     destroyNativeWindow: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     getAppVersion: vi.fn<() => Promise<string>>(() => Promise.resolve("0.0.0")),
     getPersistedAppLocale: vi.fn(() => Promise.resolve(null)),
+    getPersistedAppTheme: vi.fn<() => Promise<AppTheme>>(() => Promise.resolve("dark")),
     hideNativeWindow: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     isNativeWindowFullscreen: vi.fn<() => Promise<boolean>>(() => Promise.resolve(false)),
     isTauriRuntime: vi.fn<() => boolean>(() => false),
@@ -21,6 +23,7 @@ describe("uiStore focus mode", () => {
     minimizeNativeWindow: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     now: vi.fn<() => number>(() => 1234),
     openExternalUrl: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    readCachedAppTheme: vi.fn<() => AppTheme | null>(() => null),
     readExplorerOpenPreference: vi.fn<() => boolean | null>(() => null),
     readGitPanelPinnedPreference: vi.fn<() => boolean | null>(() => null),
     readSidebarPinnedPreference: vi.fn<() => boolean | null>(() => null),
@@ -32,9 +35,11 @@ describe("uiStore focus mode", () => {
     ),
     setNativeWindowFullscreen: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     setPersistedAppLocale: vi.fn((locale) => Promise.resolve(locale)),
+    setPersistedAppTheme: vi.fn<(theme: AppTheme) => Promise<AppTheme>>((theme) => Promise.resolve(theme)),
     startNativeWindowDrag: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     startNativeWindowResizeDrag: vi.fn<() => Promise<void>>(() => Promise.resolve()),
     toggleNativeWindowMaximize: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+    writeCachedAppTheme: vi.fn(),
     writeExplorerOpenPreference: vi.fn(),
     writeGitPanelPinnedPreference: vi.fn(),
     writeSidebarPinnedPreference: vi.fn(),
@@ -43,6 +48,25 @@ describe("uiStore focus mode", () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
+    shellUiGateway.getPersistedAppTheme.mockResolvedValue("dark");
+    shellUiGateway.readCachedAppTheme.mockReturnValue(null);
+    shellUiGateway.setPersistedAppTheme.mockImplementation((theme) => Promise.resolve(theme));
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: {
+        documentElement: {
+          theme: "dark",
+          setAttribute(name: string, value: string) {
+            if (name === "data-theme") {
+              this.theme = value;
+            }
+          },
+          getAttribute(name: string) {
+            return name === "data-theme" ? this.theme : null;
+          },
+        },
+      },
+    });
     ({ useUiStore } = await import("./uiStore"));
     ({ configureShellUiGateway } = await import("../contexts/shell-ui/application/shellUiGateway"));
     ({ hydrateShellUiPreferences } = await import("../contexts/shell-ui/application/uiStore"));
@@ -53,6 +77,7 @@ describe("uiStore focus mode", () => {
       showGitPanel: true,
       gitPanelPinned: true,
       showExplorer: true,
+      theme: "dark",
       focusMode: false,
       focusModeSnapshot: null,
       activeView: "chat",
@@ -183,6 +208,46 @@ describe("uiStore focus mode", () => {
       gitPanelPinned: false,
       showExplorer: false,
     });
+  });
+
+  it("hydrates cached theme immediately and then applies persisted theme", async () => {
+    shellUiGateway.readCachedAppTheme.mockReturnValue("light");
+    shellUiGateway.getPersistedAppTheme.mockResolvedValue("dark");
+
+    hydrateShellUiPreferences();
+
+    expect(useUiStore.getState().theme).toBe("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+
+    await Promise.resolve();
+
+    expect(shellUiGateway.getPersistedAppTheme).toHaveBeenCalled();
+    expect(shellUiGateway.writeCachedAppTheme).toHaveBeenCalledWith("dark");
+    expect(useUiStore.getState().theme).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("persists theme changes", async () => {
+    shellUiGateway.setPersistedAppTheme.mockResolvedValue("light");
+
+    await expect(useUiStore.getState().setTheme("light")).resolves.toBe("light");
+
+    expect(shellUiGateway.setPersistedAppTheme).toHaveBeenCalledWith("light");
+    expect(shellUiGateway.writeCachedAppTheme).toHaveBeenCalledWith("light");
+    expect(useUiStore.getState().theme).toBe("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("rolls back theme changes when persistence fails", async () => {
+    useUiStore.setState({ theme: "dark" });
+    document.documentElement.setAttribute("data-theme", "dark");
+    shellUiGateway.setPersistedAppTheme.mockRejectedValue(new Error("save failed"));
+
+    await expect(useUiStore.getState().setTheme("light")).resolves.toBeNull();
+
+    expect(useUiStore.getState().theme).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(shellUiGateway.writeCachedAppTheme).toHaveBeenLastCalledWith("dark");
   });
 
   it("opens the command palette with structured launch defaults", () => {

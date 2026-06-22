@@ -1,4 +1,9 @@
 import { create } from "zustand";
+import {
+  applyAppTheme,
+  DEFAULT_APP_THEME,
+  type AppTheme,
+} from "../domain/appTheme";
 import { COMMAND_PALETTE_DEFAULT_LAUNCH } from "../domain/commandPalette";
 import {
   enterFocusMode,
@@ -14,6 +19,7 @@ export const useUiStore = create<UiState>((set) => ({
   showGitPanel: true,
   gitPanelPinned: true,
   showExplorer: true,
+  theme: DEFAULT_APP_THEME,
   focusMode: false,
   focusModeSnapshot: null,
   commandPaletteOpen: false,
@@ -66,6 +72,26 @@ export const useUiStore = create<UiState>((set) => ({
     getShellUiGateway().writeExplorerOpenPreference(open);
     set({ showExplorer: open });
   },
+  setTheme: async (theme: AppTheme) => {
+    const gateway = getShellUiGateway();
+    const previousTheme = useUiStore.getState().theme;
+    applyAppTheme(theme);
+    gateway.writeCachedAppTheme(theme);
+    set({ theme });
+
+    try {
+      const persistedTheme = await gateway.setPersistedAppTheme(theme);
+      applyAppTheme(persistedTheme);
+      gateway.writeCachedAppTheme(persistedTheme);
+      set({ theme: persistedTheme });
+      return persistedTheme;
+    } catch {
+      applyAppTheme(previousTheme);
+      gateway.writeCachedAppTheme(previousTheme);
+      set({ theme: previousTheme });
+      return null;
+    }
+  },
   setFocusMode: (enabled) =>
     set((state) => (enabled ? enterFocusMode(state) : leaveFocusMode(state))),
   toggleFocusMode: () => set((state) => toggleFocusModeState(state)),
@@ -95,10 +121,22 @@ export function hydrateShellUiPreferences(): void {
   const savedPinned = gateway.readSidebarPinnedPreference();
   const savedGitPanelPinned = gateway.readGitPanelPinnedPreference();
   const savedExplorerOpen = gateway.readExplorerOpenPreference();
+  const cachedTheme = gateway.readCachedAppTheme();
+  const initialTheme = cachedTheme ?? DEFAULT_APP_THEME;
+  applyAppTheme(initialTheme);
 
   useUiStore.setState({
     sidebarPinned: savedPinned !== null ? savedPinned : true,
     gitPanelPinned: savedGitPanelPinned !== null ? savedGitPanelPinned : true,
     showExplorer: savedExplorerOpen !== null ? savedExplorerOpen : true,
+    theme: initialTheme,
   });
+
+  void gateway.getPersistedAppTheme()
+    .then((persistedTheme) => {
+      applyAppTheme(persistedTheme);
+      gateway.writeCachedAppTheme(persistedTheme);
+      useUiStore.setState({ theme: persistedTheme });
+    })
+    .catch(() => undefined);
 }

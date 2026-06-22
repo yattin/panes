@@ -87,11 +87,7 @@ impl ProviderSettings {
             .get(provider_id)
             .and_then(|e| e.api_key.clone())
             .filter(|k| !k.trim().is_empty())
-            .or_else(|| {
-                std::env::var(env_var)
-                    .ok()
-                    .filter(|v| !v.trim().is_empty())
-            })
+            .or_else(|| std::env::var(env_var).ok().filter(|v| !v.trim().is_empty()))
     }
 
     /// Resolve the base URL for a provider.
@@ -103,11 +99,9 @@ impl ProviderSettings {
             .and_then(|e| e.api_base.clone())
             .filter(|b| !b.trim().is_empty())
             .or_else(|| {
-                env_vars.iter().find_map(|var| {
-                    std::env::var(var)
-                        .ok()
-                        .filter(|v| !v.trim().is_empty())
-                })
+                env_vars
+                    .iter()
+                    .find_map(|var| std::env::var(var).ok().filter(|v| !v.trim().is_empty()))
             })
     }
 

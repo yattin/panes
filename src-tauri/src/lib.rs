@@ -131,6 +131,9 @@ pub fn run() {
             let main_window = WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
                 .enable_clipboard_access()
                 .build()?;
+            if let Err(error) = main_window.maximize() {
+                log::warn!("failed to maximize main window on startup: {error}");
+            }
             #[cfg(not(target_os = "linux"))]
             let _ = &main_window;
 
@@ -187,6 +190,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::app::get_app_locale,
             commands::app::set_app_locale,
+            commands::app::get_app_theme,
+            commands::app::set_app_theme,
             commands::power::get_keep_awake_state,
             commands::power::set_keep_awake_enabled,
             commands::power::get_power_settings,

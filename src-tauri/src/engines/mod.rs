@@ -1201,7 +1201,9 @@ mod tests {
         assert_eq!(story.description, "Story design workflow");
         assert!(story.enabled);
         assert_eq!(story.scope, "workspace");
-        assert!(story.path.ends_with("/.agents/skills/story-design/SKILL.md"));
+        assert!(story
+            .path
+            .ends_with("/.agents/skills/story-design/SKILL.md"));
 
         let shot = skills
             .iter()
@@ -1210,10 +1212,9 @@ mod tests {
         assert_eq!(shot.description, "Shot planning workflow");
         assert!(shot.enabled);
         assert_eq!(shot.scope, "plugin:film-tools");
-        assert!(
-            shot.path
-                .ends_with("/.agents/plugins/film-tools/skills/shot-planner/SKILL.md")
-        );
+        assert!(shot
+            .path
+            .ends_with("/.agents/plugins/film-tools/skills/shot-planner/SKILL.md"));
 
         let _ = std::fs::remove_dir_all(root);
     }

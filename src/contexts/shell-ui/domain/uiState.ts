@@ -1,3 +1,5 @@
+import type { AppTheme } from "./appTheme";
+
 export type CommandPaletteVariant = "general" | "search";
 
 export type CommandPaletteSearchScope = "all" | "messages" | "files" | "threads";
@@ -27,6 +29,7 @@ export interface UiState {
   showGitPanel: boolean;
   gitPanelPinned: boolean;
   showExplorer: boolean;
+  theme: AppTheme;
   focusMode: boolean;
   focusModeSnapshot: FocusModeSnapshot | null;
   activeView: ActiveView;
@@ -44,6 +47,7 @@ export interface UiState {
   setGitPanelPinned: (pinned: boolean) => void;
   toggleExplorer: () => void;
   setExplorerOpen: (open: boolean) => void;
+  setTheme: (theme: AppTheme) => Promise<AppTheme | null>;
   setFocusMode: (enabled: boolean) => void;
   toggleFocusMode: () => void;
   setActiveView: (view: ActiveView) => void;

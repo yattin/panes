@@ -36,6 +36,8 @@ import {
   Power,
   RotateCcw,
   Minimize2,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { getChatGateway } from "../../contexts/chat/application/chatGateway";
 import { getFileEditorGateway } from "../../contexts/file-editor/application/fileEditorGateway";
@@ -330,6 +332,34 @@ export function getStaticCommands(
     action: ({ close }) => {
       close();
       useKeepAwakeStore.getState().openPowerSettings();
+    },
+  },
+  {
+    id: "theme-light",
+    label: t("commandPalette.commands.themeLight"),
+    icon: Sun,
+    group: "layout",
+    keywords: ["theme", "light", "appearance", "亮色", "主题"],
+    action: async ({ close }) => {
+      close();
+      const result = await useUiStore.getState().setTheme("light");
+      if (!result) {
+        toast.error(t("commandPalette.toasts.themeFailed"));
+      }
+    },
+  },
+  {
+    id: "theme-dark",
+    label: t("commandPalette.commands.themeDark"),
+    icon: Moon,
+    group: "layout",
+    keywords: ["theme", "dark", "appearance", "暗色", "主题"],
+    action: async ({ close }) => {
+      close();
+      const result = await useUiStore.getState().setTheme("dark");
+      if (!result) {
+        toast.error(t("commandPalette.toasts.themeFailed"));
+      }
     },
   },
   {
@@ -830,7 +860,7 @@ const STYLES = {
     position: "fixed" as const,
     inset: 0,
     zIndex: 10001,
-    background: "rgba(0, 0, 0, 0.55)",
+    background: "var(--scrim-bg)",
     backdropFilter: "blur(16px)",
     WebkitBackdropFilter: "blur(16px)",
     display: "flex",
@@ -845,10 +875,8 @@ const STYLES = {
     display: "grid",
     gridTemplateRows: "auto 1fr auto",
     borderRadius: "var(--radius-lg)",
-    background: "rgba(14, 14, 16, 0.95)",
-    boxShadow:
-      "0 0 0 1px rgba(255, 255, 255, 0.08), " +
-      "0 24px 68px rgba(0, 0, 0, 0.55)",
+    background: "var(--surface-overlay)",
+    boxShadow: "var(--modal-shadow)",
     animation: "slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1) both",
   },
   inputRow: {
@@ -919,7 +947,7 @@ const STYLES = {
     width: "calc(100% - 12px)",
     border: "none",
     borderRadius: "var(--radius-sm)",
-    background: active ? "rgba(255, 255, 255, 0.07)" : "transparent",
+    background: active ? "var(--surface-active)" : "transparent",
     cursor: "pointer",
     textAlign: "left" as const,
     fontFamily: "inherit",

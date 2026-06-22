@@ -22,7 +22,9 @@ use panes_agent::{
     },
     infrastructure::{
         anthropic::AnthropicMessagesClient,
-        env_files, google_gemini::GoogleGeminiClient, memory_files,
+        env_files,
+        google_gemini::GoogleGeminiClient,
+        memory_files,
         native_tools::{self, NativeToolExecutor},
         openai_compatible::OpenAiCompatibleClient,
         skills,
@@ -44,7 +46,7 @@ use crate::{
     db::workspaces::get_cuelight_binding_by_root,
     engines::cuelight_tools::{
         build_cuelight_system_prompt_appendix, build_cuelight_tool_specs, execute_cuelight_tool,
-        CueLightThreadContext,
+        is_cuelight_tool_name, CueLightThreadContext,
     },
 };
 
@@ -122,7 +124,9 @@ fn provider_is_available(config: &ProviderConfig, settings: &ProviderSettings) -
     if !settings.is_enabled(config.id) {
         return false;
     }
-    settings.resolve_api_key(config.id, config.api_key_env).is_some()
+    settings
+        .resolve_api_key(config.id, config.api_key_env)
+        .is_some()
 }
 
 /// 构建所有 Provider 注册表（含全部定义，调用者负责过滤）。
@@ -132,9 +136,24 @@ fn provider_registry() -> Vec<ProviderConfig> {
             id: "anthropic",
             api_key_env: "ANTHROPIC_API_KEY",
             models: vec![
-                model_info("claude-opus-4-8", "Opus 4.8", "Anthropic Claude Opus", false),
-                model_info("claude-sonnet-4-6", "Sonnet 4.6", "Anthropic Claude Sonnet", true),
-                model_info("claude-haiku-4-5-20251001", "Haiku 4.5", "Anthropic Claude Haiku", false),
+                model_info(
+                    "claude-opus-4-8",
+                    "Opus 4.8",
+                    "Anthropic Claude Opus",
+                    false,
+                ),
+                model_info(
+                    "claude-sonnet-4-6",
+                    "Sonnet 4.6",
+                    "Anthropic Claude Sonnet",
+                    true,
+                ),
+                model_info(
+                    "claude-haiku-4-5-20251001",
+                    "Haiku 4.5",
+                    "Anthropic Claude Haiku",
+                    false,
+                ),
             ],
         },
         ProviderConfig {
@@ -142,29 +161,84 @@ fn provider_registry() -> Vec<ProviderConfig> {
             api_key_env: "OPENAI_API_KEY",
             models: vec![
                 model_info("openai/gpt-5.5", "GPT-5.5", "OpenAI GPT-5.5", false),
-                model_info("openai/gpt-5.4-mini", "GPT-5.4 Mini", "OpenAI GPT-5.4 Mini", false),
+                model_info(
+                    "openai/gpt-5.4-mini",
+                    "GPT-5.4 Mini",
+                    "OpenAI GPT-5.4 Mini",
+                    false,
+                ),
             ],
         },
         ProviderConfig {
             id: "google",
             api_key_env: "GOOGLE_API_KEY",
             models: vec![
-                model_info("google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini Flash", false),
-                model_info("google/gemini-3.5-pro", "Gemini 3.5 Pro", "Google Gemini Pro", false),
+                model_info(
+                    "google/gemini-3.5-flash",
+                    "Gemini 3.5 Flash",
+                    "Google Gemini Flash",
+                    false,
+                ),
+                model_info(
+                    "google/gemini-3.5-pro",
+                    "Gemini 3.5 Pro",
+                    "Google Gemini Pro",
+                    false,
+                ),
             ],
         },
         ProviderConfig {
             id: "openrouter",
             api_key_env: "OPENROUTER_API_KEY",
             models: vec![
-                model_info("openrouter/google/gemini-3.5-flash", "Gemini 3.5 Flash", "Google Gemini via OpenRouter", false),
-                model_info("openrouter/qwen/qwen3.7-max", "Qwen3.7-Max", "Qwen via OpenRouter", false),
-                model_info("openrouter/qwen/qwen3.7-plus", "Qwen3.7-Plus", "Qwen via OpenRouter", false),
-                model_info("openrouter/deepseek/deepseek-v4-pro", "DeepSeek-V4-Pro", "DeepSeek via OpenRouter", false),
-                model_info("openrouter/deepseek/deepseek-v4-flash", "DeepSeek-V4-Flash", "DeepSeek via OpenRouter", false),
-                model_info("openrouter/zhipu/glm-5.2", "GLM-5.2", "Zhipu via OpenRouter", false),
-                model_info("openrouter/moonshotai/kimi-k2.6", "Kimi-K2.6", "Moonshot AI via OpenRouter", false),
-                model_info("openrouter/minimax/minimax-m3", "MiniMax-M3", "MiniMax via OpenRouter", false),
+                model_info(
+                    "openrouter/google/gemini-3.5-flash",
+                    "Gemini 3.5 Flash",
+                    "Google Gemini via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/qwen/qwen3.7-max",
+                    "Qwen3.7-Max",
+                    "Qwen via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/qwen/qwen3.7-plus",
+                    "Qwen3.7-Plus",
+                    "Qwen via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/deepseek/deepseek-v4-pro",
+                    "DeepSeek-V4-Pro",
+                    "DeepSeek via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/deepseek/deepseek-v4-flash",
+                    "DeepSeek-V4-Flash",
+                    "DeepSeek via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/zhipu/glm-5.2",
+                    "GLM-5.2",
+                    "Zhipu via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/moonshotai/kimi-k2.6",
+                    "Kimi-K2.6",
+                    "Moonshot AI via OpenRouter",
+                    false,
+                ),
+                model_info(
+                    "openrouter/minimax/minimax-m3",
+                    "MiniMax-M3",
+                    "MiniMax via OpenRouter",
+                    false,
+                ),
             ],
         },
     ]
@@ -679,7 +753,7 @@ impl ToolExecutor for ClaurstToolExecutor {
             return self.execute_sync_agent(call, cancellation).await;
         }
 
-        if call.name.starts_with("cuelight_") {
+        if is_cuelight_tool_name(&call.name) {
             let Some(context) = &self.cuelight_context else {
                 return Ok(ToolResult {
                     tool_use_id: call.id,
@@ -753,8 +827,11 @@ impl ClaurstToolExecutor {
             });
         }
 
-        let model =
-            model_client_for_provider(&provider_profile, &self.tool_specs, &self.provider_settings)?;
+        let model = model_client_for_provider(
+            &provider_profile,
+            &self.tool_specs,
+            &self.provider_settings,
+        )?;
         let sub_events = LocalEventSink::default();
         let ports = ClaurstRuntimePorts {
             model,
@@ -871,7 +948,19 @@ fn is_cuelight_mutation(tool_name: &str) -> bool {
         || tool_name.starts_with("cuelight_delete_")
         || matches!(
             tool_name,
-            "cuelight_upload_file" | "cuelight_generate_image" | "cuelight_generate_video"
+            "cuelight_upload_file"
+                | "cuelight_generate_image"
+                | "cuelight_generate_video"
+                | "cuelight_download_original_script"
+                | "save_story_blueprint"
+                | "save_drama_character"
+                | "save_drama_scene"
+                | "save_prop"
+                | "save_episode_outline_batch"
+                | "save_episode_text"
+                | "update_visual_bible"
+                | "save_storyboard_scripts"
+                | "update_storyboard_script"
         )
 }
 
@@ -935,14 +1024,18 @@ fn model_client_for_provider(
     let resolved = resolve_provider_credentials(provider, settings)?;
     match provider.kind {
         ProviderKind::Anthropic => Ok(ClaurstModelClient::Anthropic(
-            AnthropicMessagesClient::new(resolved.api_key, resolved.api_base, provider.model.clone())
-                .with_tool_specs(
-                    tool_specs
-                        .iter()
-                        .cloned()
-                        .map(tool_spec_to_anthropic)
-                        .collect(),
-                ),
+            AnthropicMessagesClient::new(
+                resolved.api_key,
+                resolved.api_base,
+                provider.model.clone(),
+            )
+            .with_tool_specs(
+                tool_specs
+                    .iter()
+                    .cloned()
+                    .map(tool_spec_to_anthropic)
+                    .collect(),
+            ),
         )),
         ProviderKind::OpenAiCompatible => Ok(ClaurstModelClient::OpenAiCompatible(
             OpenAiCompatibleClient::new(
@@ -981,7 +1074,11 @@ fn resolve_provider_credentials(
     let (key_env, base_envs, default_base): (&str, &[&str], &str) = match provider.kind {
         ProviderKind::Anthropic => (
             "ANTHROPIC_API_KEY",
-            &["ANTHROPIC_BASE_URL", "ANTHROPIC_API_BASE", "CLAURST_API_BASE"][..],
+            &[
+                "ANTHROPIC_BASE_URL",
+                "ANTHROPIC_API_BASE",
+                "CLAURST_API_BASE",
+            ][..],
             "https://api.anthropic.com",
         ),
         ProviderKind::Google => (
@@ -1031,11 +1128,14 @@ fn resolve_provider_credentials(
     match provider.kind {
         ProviderKind::OpenAiCompatible if provider.id == "ollama" => {
             // Ollama needs no key.
-            Ok(ResolvedCredentials { api_key: String::new(), api_base })
+            Ok(ResolvedCredentials {
+                api_key: String::new(),
+                api_base,
+            })
         }
         _ => {
-            let api_key =
-                api_key.with_context(|| format!("missing API key for provider `{}`", provider.id))?;
+            let api_key = api_key
+                .with_context(|| format!("missing API key for provider `{}`", provider.id))?;
             Ok(ResolvedCredentials { api_key, api_base })
         }
     }
@@ -1463,37 +1563,27 @@ fn map_action_type(tool_name: &str) -> ActionType {
 
 fn cue_light_tool_label(tool_name: &str) -> Option<&'static str> {
     match tool_name {
-        "cuelight_project_status" => Some("查看项目状态"),
-        "cuelight_get_story_bible" => Some("读取故事设计"),
-        "cuelight_update_story_bible" => Some("更新故事设计"),
-        "cuelight_get_visual_bible" => Some("读取视觉设计"),
-        "cuelight_update_visual_bible" => Some("更新视觉设计"),
-        "cuelight_list_characters" => Some("列出角色资产"),
-        "cuelight_get_character" => Some("读取角色资产"),
-        "cuelight_create_character" => Some("创建角色资产"),
-        "cuelight_update_character" => Some("更新角色资产"),
-        "cuelight_delete_character" => Some("删除角色资产"),
-        "cuelight_list_scenes" => Some("列出场景资产"),
-        "cuelight_get_scene" => Some("读取场景资产"),
-        "cuelight_create_scene" => Some("创建场景资产"),
-        "cuelight_update_scene" => Some("更新场景资产"),
-        "cuelight_delete_scene" => Some("删除场景资产"),
-        "cuelight_list_props" => Some("列出道具资产"),
-        "cuelight_get_prop" => Some("读取道具资产"),
-        "cuelight_create_prop" => Some("创建道具资产"),
-        "cuelight_update_prop" => Some("更新道具资产"),
-        "cuelight_delete_prop" => Some("删除道具资产"),
-        "cuelight_list_episodes" => Some("列出分集剧本"),
-        "cuelight_get_episode" => Some("读取分集剧本"),
-        "cuelight_create_episode" => Some("创建分集剧本"),
-        "cuelight_update_episode" => Some("更新分集剧本"),
-        "cuelight_delete_episode" => Some("删除分集剧本"),
-        "cuelight_list_storyboards" => Some("列出分镜规划"),
-        "cuelight_get_storyboard" => Some("读取分镜规划"),
-        "cuelight_create_storyboard" => Some("创建分镜规划"),
-        "cuelight_update_storyboard" => Some("更新分镜规划"),
-        "cuelight_delete_storyboard" => Some("删除分镜规划"),
-        "cuelight_batch_update_storyboards" => Some("批量更新分镜规划"),
+        "query_project_state" => Some("查看项目状态"),
+        "query_story_bible" => Some("读取故事设计"),
+        "query_visual_bible" => Some("读取视觉设计"),
+        "list_assets" => Some("列出资产"),
+        "query_character" => Some("读取角色资产"),
+        "query_scene" => Some("读取场景资产"),
+        "query_prop" => Some("读取道具资产"),
+        "list_episode_outlines" => Some("列出分集大纲"),
+        "query_episode" => Some("读取分集剧本"),
+        "query_storyboards" => Some("列出分镜脚本"),
+        "query_storyboard" => Some("读取分镜脚本"),
+        "save_story_blueprint" => Some("保存故事设计"),
+        "save_drama_character" => Some("保存角色资产"),
+        "save_drama_scene" => Some("保存场景资产"),
+        "save_prop" => Some("保存道具资产"),
+        "save_episode_outline_batch" => Some("保存分集大纲"),
+        "save_episode_text" => Some("保存分集正文"),
+        "generate_visual_style_prompt" => Some("生成视觉基准"),
+        "update_visual_bible" => Some("保存视觉设计"),
+        "save_storyboard_scripts" => Some("保存分镜脚本"),
+        "update_storyboard_script" => Some("更新分镜脚本"),
         "cuelight_upload_file" => Some("上传参考文件"),
         "cuelight_generate_image" => Some("生成图片"),
         "cuelight_generate_video" => Some("生成视频"),
@@ -1648,6 +1738,26 @@ mod tests {
         );
     }
 
+    #[test]
+    fn readonly_agent_blocks_cuelight_semantic_write_tools() {
+        assert!(!tool_allowed_for_agent(
+            &AgentAccessLevel::ReadOnly,
+            "save_episode_text"
+        ));
+        assert!(!tool_allowed_for_agent(
+            &AgentAccessLevel::ReadOnly,
+            "save_storyboard_scripts"
+        ));
+        assert!(!tool_allowed_for_agent(
+            &AgentAccessLevel::ReadOnly,
+            "cuelight_download_original_script"
+        ));
+        assert!(tool_allowed_for_agent(
+            &AgentAccessLevel::ReadOnly,
+            "query_project_state"
+        ));
+    }
+
     #[tokio::test]
     async fn event_sink_labels_cuelight_actions_and_records_duration() {
         let (event_tx, mut event_rx) = mpsc::channel(4);
@@ -1658,7 +1768,7 @@ mod tests {
 
         sink.emit(AgentEvent::ActionStarted {
             action_id: "action-visual".to_string(),
-            action_type: "cuelight_get_visual_bible".to_string(),
+            action_type: "query_visual_bible".to_string(),
             input: json!({}),
         })
         .await
@@ -1680,7 +1790,7 @@ mod tests {
                 display_label,
                 ..
             }) => {
-                assert_eq!(summary, "cuelight_get_visual_bible");
+                assert_eq!(summary, "query_visual_bible");
                 assert_eq!(display_label.as_deref(), Some("读取视觉设计"));
             }
             other => panic!("expected action started, got {other:?}"),

@@ -23,6 +23,14 @@ fn err_to_string(error: impl ToString) -> String {
     error.to_string()
 }
 
+fn normalize_app_theme(theme: &str) -> Option<&'static str> {
+    match theme.trim().to_ascii_lowercase().as_str() {
+        "dark" => Some("dark"),
+        "light" => Some("light"),
+        _ => None,
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn macos_sound_preview_process() -> &'static Mutex<Option<Child>> {
     static PROCESS: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
@@ -145,6 +153,36 @@ pub async fn set_app_locale(state: State<'_, AppState>, locale: String) -> Resul
             normalize_app_locale(&locale).ok_or_else(|| format!("unsupported locale: {locale}"))?;
         AppConfig::mutate(|config| {
             config.general.locale = Some(normalized.to_string());
+            Ok(normalized.to_string())
+        })
+        .map_err(err_to_string)
+    })
+    .await
+    .map_err(err_to_string)?
+}
+
+#[tauri::command]
+pub async fn get_app_theme() -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let config = AppConfig::load_or_create().map_err(err_to_string)?;
+        Ok(normalize_app_theme(&config.general.theme)
+            .unwrap_or("dark")
+            .to_string())
+    })
+    .await
+    .map_err(err_to_string)?
+}
+
+#[tauri::command]
+pub async fn set_app_theme(state: State<'_, AppState>, theme: String) -> Result<String, String> {
+    let config_write_lock = state.config_write_lock.clone();
+    let _guard = config_write_lock.lock_owned().await;
+
+    tokio::task::spawn_blocking(move || {
+        let normalized =
+            normalize_app_theme(&theme).ok_or_else(|| format!("unsupported theme: {theme}"))?;
+        AppConfig::mutate(|config| {
+            config.general.theme = normalized.to_string();
             Ok(normalized.to_string())
         })
         .map_err(err_to_string)
@@ -278,6 +316,19 @@ pub async fn preview_notification_sound(
     #[cfg(not(target_os = "macos"))]
     {
         preview_notification_sound_via_notification(app, &sound)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_app_theme;
+
+    #[test]
+    fn normalize_app_theme_accepts_only_supported_themes() {
+        assert_eq!(normalize_app_theme("dark"), Some("dark"));
+        assert_eq!(normalize_app_theme(" Light "), Some("light"));
+        assert_eq!(normalize_app_theme("system"), None);
+        assert_eq!(normalize_app_theme(""), None);
     }
 }
 

@@ -323,9 +323,7 @@ fn parse_gemini_frame(frame: &str, state: &mut GeminiStreamState) {
         };
         if let Some(text) = extract_text_from_response(&value) {
             if !text.is_empty() {
-                state
-                    .pending
-                    .push_back(ModelStreamEvent::TextDelta(text));
+                state.pending.push_back(ModelStreamEvent::TextDelta(text));
             }
         }
         for call in extract_tool_calls(&value) {
@@ -348,10 +346,7 @@ mod tests {
                 "content": { "parts": [{ "text": "hello" }] }
             }]
         });
-        assert_eq!(
-            extract_text_from_response(&chunk).as_deref(),
-            Some("hello")
-        );
+        assert_eq!(extract_text_from_response(&chunk).as_deref(), Some("hello"));
     }
 
     #[test]

@@ -1,9 +1,12 @@
 import type { ShellUiGateway } from "../application/shellUiGateway";
 import { appLocaleRepository } from "./appLocaleRepository";
+import { appThemeRepository } from "./appThemeRepository";
 import {
+  readCachedAppTheme,
   readExplorerOpenPreference,
   readGitPanelPinnedPreference,
   readSidebarPinnedPreference,
+  writeCachedAppTheme,
   writeExplorerOpenPreference,
   writeGitPanelPinnedPreference,
   writeSidebarPinnedPreference,
@@ -34,6 +37,7 @@ export const shellUiGateway: ShellUiGateway = {
   destroyNativeWindow,
   getAppVersion,
   getPersistedAppLocale: appLocaleRepository.getPersistedLocale,
+  getPersistedAppTheme: appThemeRepository.getPersistedTheme,
   hideNativeWindow,
   isNativeWindowFullscreen,
   isTauriRuntime,
@@ -41,6 +45,7 @@ export const shellUiGateway: ShellUiGateway = {
   minimizeNativeWindow,
   now: shellRuntime.now,
   openExternalUrl,
+  readCachedAppTheme,
   readExplorerOpenPreference,
   readGitPanelPinnedPreference,
   readSidebarPinnedPreference,
@@ -50,9 +55,11 @@ export const shellUiGateway: ShellUiGateway = {
   selectTextFile,
   setNativeWindowFullscreen,
   setPersistedAppLocale: appLocaleRepository.setPersistedLocale,
+  setPersistedAppTheme: appThemeRepository.setPersistedTheme,
   startNativeWindowDrag,
   startNativeWindowResizeDrag,
   toggleNativeWindowMaximize,
+  writeCachedAppTheme,
   writeExplorerOpenPreference,
   writeGitPanelPinnedPreference,
   writeSidebarPinnedPreference,

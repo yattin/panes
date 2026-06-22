@@ -80,4 +80,14 @@ describe("CustomWindowFrame", () => {
 
     expect(maximizeButtonProps).not.toBeNull();
   });
+
+  it("does not render the legacy menu cluster", () => {
+    const tree = CustomWindowFrame({ frameState: { isFullscreen: false, isMaximized: false } });
+    const menuProps = findElement(
+      tree,
+      (props) => props.className === "linux-window-chrome-menus no-drag",
+    );
+
+    expect(menuProps).toBeNull();
+  });
 });

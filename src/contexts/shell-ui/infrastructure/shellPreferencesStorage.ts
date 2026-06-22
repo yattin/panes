@@ -1,6 +1,10 @@
+import type { AppTheme } from "../domain/appTheme";
+import { normalizeAppTheme } from "../domain/appTheme";
+
 const SIDEBAR_PINNED_KEY = "panes:sidebarPinned";
 const GIT_PANEL_PINNED_KEY = "panes:gitPanelPinned";
 const EXPLORER_OPEN_KEY = "panes:explorerOpen";
+const APP_THEME_KEY = "panes:appTheme";
 
 function readBooleanPreference(key: string): boolean | null {
   try {
@@ -41,4 +45,20 @@ export function readExplorerOpenPreference(): boolean | null {
 
 export function writeExplorerOpenPreference(open: boolean) {
   writeBooleanPreference(EXPLORER_OPEN_KEY, open);
+}
+
+export function readCachedAppTheme(): AppTheme | null {
+  try {
+    return normalizeAppTheme(localStorage.getItem(APP_THEME_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedAppTheme(theme: AppTheme) {
+  try {
+    localStorage.setItem(APP_THEME_KEY, theme);
+  } catch {
+    // Ignore storage failures in non-browser/test environments.
+  }
 }

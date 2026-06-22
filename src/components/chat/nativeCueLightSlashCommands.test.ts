@@ -31,17 +31,57 @@ describe("nativeCueLightSlashCommands", () => {
     );
 
     expect(storyDesign?.tools).toEqual([
+      "query_story_bible",
+      "save_story_blueprint",
+    ]);
+    expect(storyDesign?.template).toContain("query_story_bible");
+    expect(visualDesign?.tools).toEqual([
+      "query_visual_bible",
+      "generate_visual_style_prompt",
+      "update_visual_bible",
+    ]);
+    expect(visualDesign?.template).toContain("update_visual_bible");
+    expect(storyboards?.tools).toContain("save_storyboard_scripts");
+    expect(storyboards?.template).toContain("query_storyboards");
+  });
+
+  it("does not steer visible commands toward retired low-level CueLight CRUD tools", () => {
+    const retiredToolNames = [
+      "cuelight_project_status",
       "cuelight_get_story_bible",
       "cuelight_update_story_bible",
-    ]);
-    expect(storyDesign?.template).toContain("cuelight_get_story_bible");
-    expect(visualDesign?.tools).toEqual([
       "cuelight_get_visual_bible",
       "cuelight_update_visual_bible",
-    ]);
-    expect(visualDesign?.template).toContain("cuelight_update_visual_bible");
-    expect(storyboards?.tools).toContain("cuelight_batch_update_storyboards");
-    expect(storyboards?.template).toContain("cuelight_list_storyboards");
+      "cuelight_list_characters",
+      "cuelight_create_character",
+      "cuelight_update_character",
+      "cuelight_list_episodes",
+      "cuelight_update_episode",
+      "cuelight_list_storyboards",
+      "cuelight_batch_update_storyboards",
+    ];
+    const commandSurface = nativeCueLightSlashCommands
+      .map((command) => `${command.tools.join("\n")}\n${command.template}`)
+      .join("\n");
+
+    for (const retiredToolName of retiredToolNames) {
+      expect(commandSurface).not.toContain(retiredToolName);
+    }
+  });
+
+  it("routes long scripts through local draft files before semantic imports", () => {
+    const episodes = nativeCueLightSlashCommands.find(
+      (command) => command.label === "分集剧本",
+    );
+    const storyboards = nativeCueLightSlashCommands.find(
+      (command) => command.label === "分镜规划",
+    );
+
+    expect(episodes?.template).toContain("file_write");
+    expect(episodes?.template).toContain(".cuelight/drafts/");
+    expect(episodes?.template).toContain("contentPath");
+    expect(storyboards?.template).toContain("file_write");
+    expect(storyboards?.template).toContain("storyboardsPath");
   });
 
   it("templates require direct tool use instead of stopping after a plan", () => {
@@ -67,7 +107,7 @@ describe("nativeCueLightSlashCommands", () => {
       "用户补充：\n重点看分镜进度",
     );
     expect(compileCueLightCommandPrompt(command!, "重点看分镜进度")).toContain(
-      "cuelight_project_status",
+      "query_project_state",
     );
   });
 
@@ -84,8 +124,9 @@ describe("nativeCueLightSlashCommands", () => {
   });
 
   it("maps CueLight tool names to Chinese action labels", () => {
+    expect(getCueLightToolLabel("query_visual_bible")).toBe("读取视觉设计");
+    expect(getCueLightToolLabel("update_visual_bible")).toBe("更新视觉设计");
     expect(getCueLightToolLabel("cuelight_get_visual_bible")).toBe("读取视觉设计");
-    expect(getCueLightToolLabel("cuelight_update_visual_bible")).toBe("更新视觉设计");
     expect(getCueLightToolLabel("cuelight_download_original_script")).toBe("下载剧本原文");
     expect(getCueLightToolLabel("search")).toBeNull();
   });
